@@ -84,6 +84,14 @@
 
     <!-- COMBUSTÍVEL -->
     <div id="aba-combustivel" class="tab-content">
+        <!-- NOVIDADE: Botão de Importar PDF -->
+        <div style="margin-bottom: 15px; text-align: right;">
+            <input type="file" id="upload-pdf" accept=".pdf" style="display: none;" onchange="importarPDF(event)">
+            <button style="padding: 8px 15px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="document.getElementById('upload-pdf').click()">
+                📄 Ler PDF de Abastecimento
+            </button>
+        </div>
+
         <table id="combTable">
             <thead>
                 <tr>
@@ -186,7 +194,7 @@
         const inputAtual = e.target;
         if (inputAtual.tagName !== 'INPUT') return;
 
-        if (e.key === 'Escape') {
+        if (e.key === 'Backspace') {
             if (inputAtual.value === '') {
                 e.preventDefault();
                 const trAtual = inputAtual.closest('tr');
@@ -374,6 +382,70 @@
         
         // Limpa o campo do arquivo para permitir importar o mesmo de novo se precisar
         event.target.value = '';
+    }
+
+    // --- LÓGICA DE IMPORTAÇÃO DO PDF DE COMBUSTÍVEL ---
+    async function importarPDF(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Feedback visual no botão enquanto processa
+        const btnVisual = event.target.nextElementSibling;
+        const textoOriginal = btnVisual.innerText;
+        btnVisual.innerText = "⏳ Extraindo dados do PDF...";
+        btnVisual.style.backgroundColor = "#6c757d";
+
+        try {
+            const resposta = await fetch('/api/importar_pdf_combustivel', {
+                method: 'POST',
+                body: formData
+            });
+            const resultado = await resposta.json();
+
+            if (resultado.status === "debug") {
+                console.log(resultado.debug_data);
+                alert("Modo Debug ativado! O resultado foi impresso no terminal do Python (e no console do navegador). Copie os dados do terminal e mande aqui para ajustarmos.");
+                event.target.value = '';
+                btnVisual.innerText = textoOriginal;
+                btnVisual.style.backgroundColor = "#17a2b8";
+                return; // Para o código aqui
+            }
+            
+            if (resultado.status === "sucesso") {
+                const tbody = document.querySelector('#combTable tbody');
+                tbody.innerHTML = ''; // Limpa a tabela atual
+                
+                if(resultado.combustivel.length > 0) {
+                    resultado.combustivel.forEach(linha => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><input type="number" class="dia" value="${linha.dia}"></td>
+                            <td><input type="number" step="0.1" class="km-bomba" value="${linha.km_bomba}"></td>
+                            <td><input type="number" step="0.1" class="litros" value="${linha.litros}"></td>
+                            <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    alert(`✅ Sucesso! ${resultado.combustivel.length} registros de abastecimento foram extraídos do PDF.`);
+                } else {
+                    criarNovaLinhaComb();
+                    alert("⚠️ O PDF foi lido, mas nenhum dado válido de combustível foi encontrado. Verifique se o formato do relatório está correto.");
+                }
+            } else {
+                alert("Erro ao ler PDF: " + resultado.mensagem);
+            }
+        } catch (erro) {
+            console.error(erro);
+            alert("Erro de comunicação com o servidor ao processar o PDF.");
+        }
+        
+        // Restaura o botão e limpa o input
+        event.target.value = '';
+        btnVisual.innerText = textoOriginal;
+        btnVisual.style.backgroundColor = "#17a2b8";
     }
 </script>
 
