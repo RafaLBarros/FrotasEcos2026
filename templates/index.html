@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Calculadora ECOS - Tabela Otimizada</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; }
+        h2 { color: #333; margin-bottom: 5px;}
+        .subtitle { color: #666; font-size: 14px; margin-bottom: 20px; }
+        
+        /* Abas */
+        .tab-buttons { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab-btn { background: none; border: none; padding: 10px 20px; cursor: pointer; font-size: 16px; color: #666; outline: none; transition: 0.2s; }
+        .tab-btn:hover { color: #0056b3; background-color: #f8f9fa; }
+        .tab-btn.active { color: #0056b3; border-bottom: 3px solid #0056b3; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Tabela */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 0; text-align: left; }
+        th { background-color: #0056b3; color: white; padding: 10px; }
+        
+        input { width: 100%; border: none; padding: 12px; box-sizing: border-box; outline: none; background: transparent; font-size: 15px; }
+        input:focus { background-color: #e8f0fe; box-shadow: inset 0 -2px 0 #0056b3; }
+        ::placeholder { color: #aaa; font-style: italic; }
+        
+        /* --- NOVIDADE: Estilos de Erro e Botão de Excluir --- */
+        .input-error { background-color: #ffe6e6 !important; box-shadow: inset 0 -2px 0 #dc3545 !important; }
+        .btn-excluir { background: transparent; border: none; color: #dc3545; cursor: pointer; width: 100%; height: 100%; padding: 12px; transition: 0.2s; }
+        .btn-excluir:hover { background-color: #f8d7da; }
+
+        .btn-auditar { margin-top: 20px; padding: 12px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;}
+        .btn-auditar:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🚗 Sistema de Auditoria de Frotas - ECOS</h2>
+    <div class="subtitle">
+        <strong>Atalhos:</strong> <code>Enter</code> avança / aceita sugestão. <code>Esc</code> (com campo vazio) volta.
+    </div>
+
+    <div class="tab-buttons" style="display: flex; justify-content: space-between;">
+        <div>
+            <button class="tab-btn active" onclick="abrirAba(event, 'aba-bdt')">📋 BDT (Viagens)</button>
+            <button class="tab-btn" onclick="abrirAba(event, 'aba-combustivel')">⛽ Relatório de Abastecimento</button>
+        </div>
+        <div>
+            <!-- Input escondido e Botão Bonito -->
+            <input type="file" id="upload-excel" accept=".xlsx" style="display: none;" onchange="importarExcel(event)">
+            <button style="padding: 10px 20px; background-color: #ffc107; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="document.getElementById('upload-excel').click()">📂 Importar Planilha Salva</button>
+        </div>
+    </div>
+
+    <!-- BDT -->
+    <div id="aba-bdt" class="tab-content active">
+        <table id="bdtTable">
+            <thead>
+                <tr>
+                    <th width="10%">Dia</th>
+                    <th width="30%">Origem</th>
+                    <th width="30%">Destino</th>
+                    <th width="12%">KM Inicial</th>
+                    <th width="12%">KM Final</th>
+                    <th width="6%" style="text-align: center;">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input type="number" class="dia" placeholder="Ex: 2"></td>
+                    <td><input type="text" class="origem"></td>
+                    <td><input type="text" class="destino"></td>
+                    <td><input type="number" step="0.1" class="km-in"></td>
+                    <td><input type="number" step="0.1" class="km-out"></td>
+                    <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- COMBUSTÍVEL -->
+    <div id="aba-combustivel" class="tab-content">
+        <table id="combTable">
+            <thead>
+                <tr>
+                    <th width="20%">Dia</th>
+                    <th width="35%">KM Marcado na Bomba</th>
+                    <th width="35%">Litros Abastecidos</th>
+                    <th width="10%" style="text-align: center;">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input type="number" class="dia" placeholder="Ex: 4"></td>
+                    <td><input type="number" step="0.1" class="km-bomba"></td>
+                    <td><input type="number" step="0.1" class="litros"></td>
+                    <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <button class="btn-auditar" onclick="enviarParaAuditoria()">🔍 Rodar Auditoria Completa</button>
+    <!-- NOVIDADE: CAIXA DE RELATÓRIO ESCONDIDA -->
+    <div id="box-relatorio" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #333;">📊 Relatório de Auditoria</h3>
+        
+        <div style="display: flex; justify-content: space-between; margin-bottom: 20px; text-align: center;">
+            <div style="background: white; padding: 15px; border-radius: 8px; width: 30%; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: #666; font-size: 14px;">Distância BDT</p>
+                <h2 style="margin: 5px 0 0 0; color: #0056b3;" id="res-km-declarado">0 km</h2>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 8px; width: 30%; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: #666; font-size: 14px;">Não Registrado (Salto)</p>
+                <h2 style="margin: 5px 0 0 0; color: #dc3545;" id="res-km-salto">0 km</h2>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 8px; width: 30%; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: #666; font-size: 14px;">Total Rodado</p>
+                <h2 style="margin: 5px 0 0 0; color: #28a745;" id="res-km-total">0 km</h2>
+            </div>
+        </div>
+
+        <div id="lista-alertas" style="margin-bottom: 20px;"></div>
+
+        <a id="btn-download" style="display: block; text-align: center; background: #0056b3; color: white; padding: 12px; text-decoration: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
+            📥 Baixar Relatório Completo (Excel)
+        </a>
+    </div>
+</div>
+
+<script>
+    function abrirAba(evento, idAba) {
+        document.querySelectorAll('.tab-content').forEach(aba => aba.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(idAba).classList.add('active');
+        evento.currentTarget.classList.add('active');
+    }
+
+    // --- NOVIDADE: Função de Deletar ---
+    function deletarLinha(botao) {
+        const tr = botao.closest('tr');
+        const tbody = tr.closest('tbody');
+        const tabelaId = tr.closest('table').id;
+        
+        tr.remove(); // Apaga a linha
+
+        // Se o usuário apagar a única linha que tinha, recriamos uma vazia pra tabela não sumir
+        if (tbody.children.length === 0) {
+            if (tabelaId === 'bdtTable') criarNovaLinhaBDT();
+            else criarNovaLinhaComb();
+        }
+    }
+
+    function criarNovaLinhaBDT(sugestaoDia = '', sugestaoOrigem = '', sugestaoKmIn = '') {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="number" class="dia" placeholder="${sugestaoDia}" data-sugestao="${sugestaoDia}"></td>
+            <td><input type="text" class="origem" placeholder="${sugestaoOrigem}" data-sugestao="${sugestaoOrigem}"></td>
+            <td><input type="text" class="destino"></td>
+            <td><input type="number" step="0.1" class="km-in" placeholder="${sugestaoKmIn}" data-sugestao="${sugestaoKmIn}"></td>
+            <td><input type="number" step="0.1" class="km-out"></td>
+            <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+        `;
+        document.querySelector('#bdtTable tbody').appendChild(tr);
+        return tr;
+    }
+
+    function criarNovaLinhaComb() {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="number" class="dia"></td>
+            <td><input type="number" step="0.1" class="km-bomba"></td>
+            <td><input type="number" step="0.1" class="litros"></td>
+            <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+        `;
+        document.querySelector('#combTable tbody').appendChild(tr);
+        return tr;
+    }
+
+    // Navegação via teclado
+    document.addEventListener('keydown', function(e) {
+        const inputAtual = e.target;
+        if (inputAtual.tagName !== 'INPUT') return;
+
+        if (e.key === 'Escape') {
+            if (inputAtual.value === '') {
+                e.preventDefault();
+                const trAtual = inputAtual.closest('tr');
+                const inputsNaLinha = Array.from(trAtual.querySelectorAll('input'));
+                const indexAtual = inputsNaLinha.indexOf(inputAtual);
+                if (indexAtual > 0) inputsNaLinha[indexAtual - 1].focus();
+            }
+        }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            
+            if (inputAtual.value === '' && inputAtual.dataset.sugestao) {
+                inputAtual.value = inputAtual.dataset.sugestao;
+            }
+
+            const trAtual = inputAtual.closest('tr');
+            const tabelaId = trAtual.closest('table').id;
+            const inputsNaLinha = Array.from(trAtual.querySelectorAll('input'));
+            const indexAtual = inputsNaLinha.indexOf(inputAtual);
+            
+            if (indexAtual < inputsNaLinha.length - 1) {
+                inputsNaLinha[indexAtual + 1].focus();
+            } else {
+                let proximaTr = trAtual.nextElementSibling;
+                if (!proximaTr) {
+                    if (tabelaId === 'bdtTable') {
+                        const diaAtual = inputsNaLinha[0].value;
+                        const destinoAtual = inputsNaLinha[2].value;
+                        const kmFinalAtual = inputsNaLinha[4].value;
+                        proximaTr = criarNovaLinhaBDT(diaAtual, destinoAtual, kmFinalAtual);
+                    } else if (tabelaId === 'combTable') {
+                        proximaTr = criarNovaLinhaComb();
+                    }
+                }
+                proximaTr.querySelector('input').focus();
+            }
+        }
+    });
+
+    async function enviarParaAuditoria() {
+        const payload = { bdt: [], combustivel: [] };
+        let bloqueiaEnvio = false;
+
+        document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+
+        document.querySelectorAll('#bdtTable tbody tr').forEach(linha => {
+            const inputs = Array.from(linha.querySelectorAll('input'));
+            const preenchidos = inputs.filter(i => i.value.trim() !== '');
+            if (preenchidos.length > 0 && preenchidos.length < 5) {
+                bloqueiaEnvio = true;
+                inputs.forEach(i => { if (i.value.trim() === '') i.classList.add('input-error'); });
+            } else if (preenchidos.length === 5) {
+                payload.bdt.push({ dia: inputs[0].value, origem: inputs[1].value, destino: inputs[2].value, km_in: inputs[3].value, km_out: inputs[4].value });
+            }
+        });
+
+        document.querySelectorAll('#combTable tbody tr').forEach(linha => {
+            const inputs = Array.from(linha.querySelectorAll('input'));
+            const preenchidos = inputs.filter(i => i.value.trim() !== '');
+            if (preenchidos.length > 0 && preenchidos.length < 3) {
+                bloqueiaEnvio = true;
+                inputs.forEach(i => { if (i.value.trim() === '') i.classList.add('input-error'); });
+            } else if (preenchidos.length === 3) {
+                payload.combustivel.push({ dia: inputs[0].value, km_bomba: inputs[1].value, litros: inputs[2].value });
+            }
+        });
+
+        if (bloqueiaEnvio) {
+            alert("⚠️ Existem campos obrigatórios vazios! Preencha ou exclua a linha.");
+            return;
+        }
+
+        if (payload.bdt.length === 0 && payload.combustivel.length === 0) {
+            alert("⚠️ Digite os dados antes de auditar.");
+            return;
+        }
+        
+        try {
+            const resposta = await fetch('/api/auditar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const resultado = await resposta.json();
+            
+            // --- NOVIDADE: RENDERIZANDO O RELATÓRIO NA TELA ---
+            document.getElementById('box-relatorio').style.display = 'block';
+            document.getElementById('res-km-declarado').innerText = resultado.km_declarado + " km";
+            document.getElementById('res-km-salto').innerText = resultado.km_nao_registrado + " km";
+            document.getElementById('res-km-total').innerText = resultado.total_rodado + " km";
+
+            const divAlertas = document.getElementById('lista-alertas');
+            divAlertas.innerHTML = ""; // limpa os alertas antigos
+            
+            if (resultado.alertas.length > 0) {
+                resultado.alertas.forEach(alerta => {
+                    const p = document.createElement('p');
+                    p.style.cssText = "color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 4px; margin: 5px 0; border-left: 4px solid #dc3545;";
+                    p.innerText = alerta;
+                    divAlertas.appendChild(p);
+                });
+            } else {
+                divAlertas.innerHTML = '<p style="color: #28a745; font-weight: bold;">✅ Nenhuma inconsistência matemática ou de data detectada!</p>';
+            }
+
+            // --- CONFIGURANDO O BOTÃO DE DOWNLOAD EXCEL ---
+            const btnDownload = document.getElementById('btn-download');
+            btnDownload.href = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + resultado.excel_b64;
+            btnDownload.download = "Auditoria_ECOS_Resultado.xlsx";
+            
+            // Rola a tela suavemente para o relatório
+            document.getElementById('box-relatorio').scrollIntoView({ behavior: 'smooth' });
+
+        } catch (erro) {
+            console.error("Erro na comunicação:", erro);
+        }
+    }
+    // --- LÓGICA DE IMPORTAÇÃO DE EXCEL ---
+    async function importarExcel(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const resposta = await fetch('/api/importar', {
+                method: 'POST',
+                body: formData
+            });
+            const resultado = await resposta.json();
+            
+            if (resultado.status === "sucesso") {
+                // Limpa as tabelas atuais
+                document.querySelector('#bdtTable tbody').innerHTML = '';
+                document.querySelector('#combTable tbody').innerHTML = '';
+                
+                // Preenche BDT
+                if(resultado.bdt.length > 0) {
+                    resultado.bdt.forEach(linha => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><input type="number" class="dia" value="${linha.dia}"></td>
+                            <td><input type="text" class="origem" value="${linha.origem}"></td>
+                            <td><input type="text" class="destino" value="${linha.destino}"></td>
+                            <td><input type="number" step="0.1" class="km-in" value="${linha.km_in}"></td>
+                            <td><input type="number" step="0.1" class="km-out" value="${linha.km_out}"></td>
+                            <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+                        `;
+                        document.querySelector('#bdtTable tbody').appendChild(tr);
+                    });
+                } else {
+                    criarNovaLinhaBDT(); // Cria uma vazia se vier sem dados
+                }
+
+                // Preenche Combustivel
+                if(resultado.combustivel && resultado.combustivel.length > 0) {
+                    resultado.combustivel.forEach(linha => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><input type="number" class="dia" value="${linha.dia}"></td>
+                            <td><input type="number" step="0.1" class="km-bomba" value="${linha.km_bomba}"></td>
+                            <td><input type="number" step="0.1" class="litros" value="${linha.litros}"></td>
+                            <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+                        `;
+                        document.querySelector('#combTable tbody').appendChild(tr);
+                    });
+                } else {
+                    criarNovaLinhaComb();
+                }
+                
+                alert("✅ Planilha importada com sucesso!");
+                // Reseta o visual de relatório e de erros se tiver
+                document.getElementById('box-relatorio').style.display = 'none';
+                document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+
+            } else {
+                alert("Erro ao importar: " + resultado.mensagem);
+            }
+        } catch (erro) {
+            console.error(erro);
+            alert("Erro de comunicação com o servidor ao importar o Excel.");
+        }
+        
+        // Limpa o campo do arquivo para permitir importar o mesmo de novo se precisar
+        event.target.value = '';
+    }
+</script>
+
+</body>
+</html>
