@@ -32,6 +32,16 @@
         .btn-excluir:hover { background-color: #f8d7da; }
         .btn-auditar { margin-top: 20px; padding: 12px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;}
         .btn-auditar:hover { background-color: #218838; }
+
+        /* NOVOS ESTILOS PARA O RELATÓRIO AGRUPADO */
+        details { background: white; border: 1px solid #eee; margin-bottom: 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        details > summary { padding: 12px; cursor: pointer; font-weight: bold; outline: none; list-style: none; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+        details > summary:hover { background-color: #f8f9fa; }
+        details > summary::-webkit-details-marker { display: none; } /* Esconde setinha padrão */
+        details[open] > summary { border-bottom: 1px solid #eee; background-color: #f8f9fa; }
+        .setinha { font-size: 12px; color: #666; transition: transform 0.2s; }
+        details[open] .setinha { transform: rotate(180deg); }
+        .badge-qtd { background: #e9ecef; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: #333; min-width: 20px; text-align: center;}
     </style>
 </head>
 <body>
@@ -63,11 +73,11 @@
             <thead>
                 <tr>
                     <th width="6%">Dia</th>
-                    <th width="8%">Hora In.</th>
+                    <th width="10%">Hora In.</th>
+                    <th width="12%">KM Inicial</th>
                     <th width="20%">Origem</th>
                     <th width="20%" class="th-destino">Destino</th>
-                    <th width="8%">Hora Fim</th>
-                    <th width="12%">KM Inicial</th>
+                    <th width="10%">Hora Fim</th>
                     <th width="12%">KM Final</th>
                     <th width="5%" style="text-align: center;">Ação</th>
                 </tr>
@@ -76,10 +86,10 @@
                 <tr>
                     <td><input type="number" class="dia" placeholder="Dia"></td>
                     <td><input type="time" class="hora-in"></td>
+                    <td><input type="number" step="0.1" class="km-in" placeholder="KM In"></td>
                     <td><input type="text" class="origem" placeholder="Origem"></td>
                     <td class="td-destino"><input type="text" class="destino" placeholder="Destino"></td>
                     <td><input type="time" class="hora-out"></td>
-                    <td><input type="number" step="0.1" class="km-in" placeholder="KM In"></td>
                     <td><input type="number" step="0.1" class="km-out" placeholder="KM Out"></td>
                     <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
                 </tr>
@@ -120,22 +130,33 @@
     <!-- BOX DE RELATORIO MANTIDO IGUAL -->
     <div id="box-relatorio" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px;">
         <h3 style="margin-top: 0; color: #333;">📊 Relatório de Auditoria</h3>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 20px; text-align: center;">
-            <div style="background: white; padding: 15px; border-radius: 8px; width: 30%; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                <p style="margin: 0; color: #666; font-size: 14px;">Distância BDT</p>
-                <h2 style="margin: 5px 0 0 0; color: #0056b3;" id="res-km-declarado">0 km</h2>
+        
+        <div style="display: flex; gap: 15px; margin-bottom: 25px; text-align: center; flex-wrap: wrap;">
+            <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; min-width: 120px; border-left: 3px solid #0056b3; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: #666; font-size: 13px; font-weight: bold;">Distância BDT</p>
+                <h2 style="margin: 5px 0 0 0; color: #0056b3; font-size: 22px;" id="res-km-declarado">0 km</h2>
             </div>
-            <div style="background: white; padding: 15px; border-radius: 8px; width: 30%; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                <p style="margin: 0; color: #666; font-size: 14px;">Não Registrado (Salto)</p>
-                <h2 style="margin: 5px 0 0 0; color: #dc3545;" id="res-km-salto">0 km</h2>
+            <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; min-width: 120px; border-left: 3px solid #dc3545; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: #666; font-size: 13px; font-weight: bold;">Não Registrado</p>
+                <h2 style="margin: 5px 0 0 0; color: #dc3545; font-size: 22px;" id="res-km-salto">0 km</h2>
             </div>
-            <div style="background: white; padding: 15px; border-radius: 8px; width: 30%; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                <p style="margin: 0; color: #666; font-size: 14px;">Total Rodado</p>
-                <h2 style="margin: 5px 0 0 0; color: #28a745;" id="res-km-total">0 km</h2>
+            <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; min-width: 120px; border-left: 3px solid #28a745; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: #666; font-size: 13px; font-weight: bold;">Total Rodado</p>
+                <h2 style="margin: 5px 0 0 0; color: #28a745; font-size: 22px;" id="res-km-total">0 km</h2>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; min-width: 120px; border-left: 3px solid #17a2b8; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: #666; font-size: 13px; font-weight: bold;">Velocidade Média</p>
+                <h2 style="margin: 5px 0 0 0; color: #17a2b8; font-size: 22px;" id="res-vel-media">0 km/h</h2>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; min-width: 120px; border-left: 3px solid #6f42c1; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <p style="margin: 0; color: #666; font-size: 13px; font-weight: bold;">Consumo (Veículo)</p>
+                <h2 style="margin: 5px 0 0 0; color: #6f42c1; font-size: 22px;" id="res-consumo">0 km/l</h2>
             </div>
         </div>
+        
         <div id="lista-alertas" style="margin-bottom: 20px;"></div>
-        <a id="btn-download" style="display: block; text-align: center; background: #0056b3; color: white; padding: 12px; text-decoration: none; border-radius: 4px; font-weight: bold; cursor: pointer;">📥 Baixar Relatório Completo (Excel)</a>
+        <a id="btn-download" style="display: block; text-align: center; background: #0056b3; color: white; padding: 12px; text-decoration: none; border-radius: 4px; font-weight: bold; cursor: pointer;">📥 Baixar Relatório Excel</a>
+        <a id="btn-download-pdf" onclick="gerarPDF()" style="display: block; text-align: center; background: #dc3545; color: white; padding: 12px; text-decoration: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px;">📄 Gerar Relatório PDF</a>
     </div>
 </div>
 
@@ -208,11 +229,11 @@
         tr.innerHTML = `
             <td><input type="number" class="dia" placeholder="${sugestaoDia}" data-sugestao="${sugestaoDia}"></td>
             <td><input type="time" class="hora-in" placeholder="${sugestaoHoraIn}" data-sugestao="${sugestaoHoraIn}"></td>
+            <td><input type="number" step="0.1" class="km-in" placeholder="${sugestaoKmIn}" data-sugestao="${sugestaoKmIn}"></td>
             <td><input type="text" class="origem" placeholder="${sugestaoOrigem}" data-sugestao="${sugestaoOrigem}"></td>
             ${tdsParadas}
             <td class="td-destino"><input type="text" class="destino"></td>
             <td><input type="time" class="hora-out"></td>
-            <td><input type="number" step="0.1" class="km-in" placeholder="${sugestaoKmIn}" data-sugestao="${sugestaoKmIn}"></td>
             <td><input type="number" step="0.1" class="km-out"></td>
             <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
         `;
@@ -428,17 +449,97 @@
             document.getElementById('res-km-salto').innerText = resultado.km_nao_registrado.toFixed(1) + " km";
             document.getElementById('res-km-total').innerText = resultado.total_rodado.toFixed(1) + " km";
 
+            // INJETANDO OS NOVOS DADOS
+            document.getElementById('res-vel-media').innerText = (resultado.velocidade_media > 0 ? resultado.velocidade_media.toFixed(1) : "0") + " km/h";
+            document.getElementById('res-consumo').innerText = (resultado.consumo > 0 ? resultado.consumo.toFixed(1) : "0") + " km/L";
+
             const divAlertas = document.getElementById('lista-alertas');
             divAlertas.innerHTML = ""; 
+            
             if (resultado.alertas.length > 0) {
+                // 1. Dicionário base para separar e agrupar
+                const categorias = {
+                    'FRD': { nome: "🚨 FRAUDES E INFRAÇÕES GRAVES", corHeader: "#dc3545", corBg: "#fff5f5", itens: {} },
+                    'ERR': { nome: "🔴 ERROS CRÍTICOS", corHeader: "#fd7e14", corBg: "#fff9f4", itens: {} },
+                    'ALT': { nome: "🟡 ALERTAS COMPORTAMENTAIS", corHeader: "#ffc107", corBg: "#fffdf5", corTexto: "#333", itens: {} }
+                };
+
+                // 2. Varrer os alertas e empilhar dentro dos códigos correspondentes
                 resultado.alertas.forEach(alerta => {
-                    const p = document.createElement('p');
-                    p.style.cssText = "color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 4px; margin: 5px 0; border-left: 4px solid #dc3545;";
-                    p.innerText = alerta;
-                    divAlertas.appendChild(p);
+                    const prefixo = alerta.codigo.substring(0, 3); // Extrai 'FRD', 'ERR' ou 'ALT'
+                    
+                    if(categorias[prefixo]) {
+                        // Se o alerta desse código ainda não existe no grupo, cria a gaveta
+                        if(!categorias[prefixo].itens[alerta.codigo]) {
+                            categorias[prefixo].itens[alerta.codigo] = {
+                                titulo: alerta.titulo,
+                                detalhe: alerta.detalhe,
+                                ocorrencias: []
+                            };
+                        }
+                        // Empilha a linha de ocorrência dentro da gaveta
+                        categorias[prefixo].itens[alerta.codigo].ocorrencias.push(alerta.resumo);
+                    }
                 });
+
+                // 3. Desenhar a tela categoria por categoria
+                ['FRD', 'ERR', 'ALT'].forEach(prefixo => {
+                    const categoria = categorias[prefixo];
+                    const codigos = Object.keys(categoria.itens);
+
+                    if (codigos.length > 0) {
+                        // Criar a caixa maior da Categoria (Ex: A caixa vermelha de Fraudes)
+                        const catDiv = document.createElement('div');
+                        catDiv.style.cssText = `margin-bottom: 25px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;`;
+
+                        // Somar total de incidências dentro desta categoria
+                        let totalIncidencias = 0;
+                        codigos.forEach(c => totalIncidencias += categoria.itens[c].ocorrencias.length);
+
+                        // Cabeçalho da Categoria
+                        const catHeader = document.createElement('div');
+                        catHeader.style.cssText = `background: ${categoria.corHeader}; color: ${categoria.corTexto || 'white'}; padding: 12px 15px; font-weight: bold; font-size: 16px;`;
+                        catHeader.innerText = `${categoria.nome} (${totalIncidencias} eventos detectados)`;
+                        catDiv.appendChild(catHeader);
+
+                        // Fundo da categoria
+                        const catContent = document.createElement('div');
+                        catContent.style.cssText = `padding: 15px; background: ${categoria.corBg};`;
+
+                        // Criar os agrupadores expansíveis (Accordions) por código de erro
+                        codigos.forEach(codigo => {
+                            const item = categoria.itens[codigo];
+                            const qtd = item.ocorrencias.length;
+
+                            const details = document.createElement('details');
+                            // Ex: " (9) 🟡 [ALT-JRN02] Jornada Diária Excessiva"
+                            details.innerHTML = `
+                                <summary>
+                                    <span style="display: flex; align-items: center; gap: 10px;">
+                                        <span class="badge-qtd" title="Quantidade de Ocorrências">${qtd}</span> 
+                                        ${item.titulo}
+                                    </span> 
+                                    <span class="setinha">▼</span>
+                                </summary>
+                                <div style="padding: 15px; border-top: 1px solid #eee;">
+                                    <ul style="margin: 0 0 15px 0; padding-left: 20px; color: #444; font-size: 14px; line-height: 1.5;">
+                                        ${item.ocorrencias.map(oc => `<li style="margin-bottom: 5px;">${oc}</li>`).join('')}
+                                    </ul>
+                                    <p style="margin: 0; font-size: 13px; color: #666; background: #f8f9fa; padding: 10px; border-radius: 4px; border-left: 3px solid #ccc;">
+                                        <i><b>Detalhe/Recomendação:</b> ${item.detalhe}</i>
+                                    </p>
+                                </div>
+                            `;
+                            catContent.appendChild(details);
+                        });
+
+                        catDiv.appendChild(catContent);
+                        divAlertas.appendChild(catDiv);
+                    }
+                });
+
             } else {
-                divAlertas.innerHTML = '<p style="color: #28a745; font-weight: bold;">✅ Nenhuma inconsistência detectada!</p>';
+                divAlertas.innerHTML = '<div style="background: #d4edda; padding: 15px; border-left: 5px solid #28a745; color: #155724; border-radius: 4px;"><strong>✅ BDT Aprovado!</strong> Nenhuma inconsistência matemática, temporal ou comportamental detectada.</div>';
             }
 
             const btnDownload = document.getElementById('btn-download');
@@ -457,27 +558,74 @@
         try {
             const resposta = await fetch('/api/importar', { method: 'POST', body: formData });
             const resultado = await resposta.json();
+            
             if (resultado.status === "sucesso") {
                 document.querySelector('#bdtTable tbody').innerHTML = '';
                 document.querySelector('#combTable tbody').innerHTML = '';
                 
+                // --- NOVIDADE: ENGENHARIA REVERSA DAS PARADAS ---
+                let maxParadas = 0;
+                
+                // 1. Descobre qual é o número máximo de paradas nesta planilha
+                if (resultado.bdt && resultado.bdt.length > 0) {
+                    resultado.bdt.forEach(linha => {
+                        if (linha.destino && linha.destino.includes(' ➔ ')) {
+                            const qtdParadas = linha.destino.split(' ➔ ').length - 1;
+                            if (qtdParadas > maxParadas) maxParadas = qtdParadas;
+                        }
+                    });
+                }
+
+                // 2. Limpa o cabeçalho antigo e cria as colunas exatas de paradas
+                document.querySelectorAll('#bdtTable thead th.th-parada').forEach(th => th.remove());
+                const theadTr = document.querySelector('#bdtTable thead tr');
+                const thDestino = theadTr.querySelector('.th-destino');
+                for (let i = 1; i <= maxParadas; i++) {
+                    const novoTh = document.createElement('th');
+                    novoTh.className = 'th-parada';
+                    novoTh.innerText = `Parada ${i}`;
+                    theadTr.insertBefore(novoTh, thDestino);
+                }
+                
+                // 3. Preenche as linhas do BDT quebrando a seta
                 if(resultado.bdt.length > 0) {
                     resultado.bdt.forEach(linha => {
+                        let paradasTexto = [];
+                        let destinoFinal = linha.destino;
+                        
+                        // Se tem seta, divide o texto!
+                        if (linha.destino && linha.destino.includes(' ➔ ')) {
+                            const partes = linha.destino.split(' ➔ ');
+                            destinoFinal = partes.pop(); // O último item é o Destino Final
+                            paradasTexto = partes;       // O resto vira parada
+                        }
+
+                        // Monta os inputs das paradas
+                        let tdsParadas = '';
+                        for (let i = 0; i < maxParadas; i++) {
+                            const valor = paradasTexto[i] || ''; // Se essa linha tiver menos paradas que a máxima, fica vazio
+                            tdsParadas += `<td><input type="text" class="parada" placeholder="Parada ${i+1}" value="${valor}"></td>`;
+                        }
+
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td><input type="number" class="dia" value="${linha.dia}"></td>
-                            <td><input type="time" class="hora-in" value="${linha.hora_in || ''}"></td>
-                            <td><input type="text" class="origem" value="${linha.origem}"></td>
-                            <td class="td-destino"><input type="text" class="destino" value="${linha.destino}"></td>
-                            <td><input type="time" class="hora-out" value="${linha.hora_out || ''}"></td>
+                            <td><input type="time" class="hora-in" value="${linha.hora_in}"></td>
                             <td><input type="number" step="0.1" class="km-in" value="${linha.km_in}"></td>
+                            <td><input type="text" class="origem" value="${linha.origem}"></td>
+                            ${tdsParadas}
+                            <td class="td-destino"><input type="text" class="destino" value="${destinoFinal}"></td>
+                            <td><input type="time" class="hora-out" value="${linha.hora_out}"></td>
                             <td><input type="number" step="0.1" class="km-out" value="${linha.km_out}"></td>
                             <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
                         `;
                         document.querySelector('#bdtTable tbody').appendChild(tr);
                     });
-                } else criarNovaLinhaBDT();
+                } else {
+                    criarNovaLinhaBDT(); // Cria uma vazia se não vier dados
+                }
 
+                // 4. Preenche a tabela de Combustível (MANTIDO IGUAL)
                 if(resultado.combustivel && resultado.combustivel.length > 0) {
                     resultado.combustivel.forEach(linha => {
                         const tr = document.createElement('tr');
@@ -490,12 +638,22 @@
                         `;
                         document.querySelector('#combTable tbody').appendChild(tr);
                     });
-                } else criarNovaLinhaComb();
+                } else {
+                    criarNovaLinhaComb();
+                }
                 
                 alert("✅ Planilha importada com sucesso!");
                 document.getElementById('box-relatorio').style.display = 'none';
-            } else alert("Erro ao importar: " + resultado.mensagem);
-        } catch (erro) { console.error(erro); alert("Erro ao importar o Excel."); }
+                document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+
+            } else {
+                alert("Erro ao importar: " + resultado.mensagem);
+            }
+        } catch (erro) {
+            console.error(erro);
+            alert("Erro de comunicação com o servidor ao importar o Excel.");
+        }
+        
         event.target.value = '';
     }
 
@@ -519,7 +677,7 @@
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td><input type="number" class="dia" value="${linha.dia}"></td>
-                            <td><input type="time" class="hora" value=""></td>
+                            <td><input type="time" class="hora" value="${linha.hora}"></td>
                             <td><input type="number" step="0.1" class="km-bomba" value="${linha.km_bomba}"></td>
                             <td><input type="number" step="0.1" class="litros" value="${linha.litros}"></td>
                             <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
@@ -532,6 +690,59 @@
         } catch (erro) { console.error(erro); }
         event.target.value = '';
         btnVisual.innerText = textoOriginal;
+    }
+
+    async function gerarPDF() {
+        // Pegamos os resultados da última auditoria que guardamos na memória do JS 
+        // ou simplesmente pegamos o que está escrito na tela
+        const dadosRelatorio = {
+            km_declarado: document.getElementById('res-km-declarado').innerText,
+            km_salto: document.getElementById('res-km-salto').innerText,
+            km_total: document.getElementById('res-km-total').innerText,
+            vel_media: document.getElementById('res-vel-media').innerText,
+            consumo: document.getElementById('res-consumo').innerText,
+            // Pegamos os alertas do DOM para manter o agrupamento
+            alertas: [] 
+        };
+
+        // Buscamos os alertas no HTML para o PDF sair igual à tela
+        // CORREÇÃO: Usar .textContent ao invés de .innerText para ler os textos "escondidos"
+        document.querySelectorAll('details').forEach(det => {
+            const titulo = det.querySelector('summary').textContent.replace('▼', '').trim();
+            
+            // Pega as ocorrências mesmo com a gaveta fechada
+            const ocorrencias = Array.from(det.querySelectorAll('li')).map(li => li.textContent.trim());
+            
+            // Pega a recomendação e limpa a palavra "Detalhe/Recomendação:" que já vinha junto
+            let detalhe = det.querySelector('p i').textContent;
+            detalhe = detalhe.replace('Detalhe/Recomendação:', '').trim();
+
+            dadosRelatorio.alertas.push({ titulo, ocorrencias, detalhe });
+        });
+
+        const btn = document.getElementById('btn-download-pdf');
+        btn.innerText = "⏳ Gerando PDF...";
+
+        try {
+            const response = await fetch('/api/gerar_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dadosRelatorio)
+            });
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Relatorio_Auditoria_ECOS.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        } catch (e) {
+            alert("Erro ao gerar PDF");
+        } finally {
+            btn.innerText = "📄 Gerar Relatório PDF Profissional";
+        }
     }
 
 </script>
