@@ -55,7 +55,7 @@ TEXTOS_AUDITORIA = {
         "detalhe": "Um abastecimento com o cartão de recarga foi detectado exatamente no intervalo de um salto não registrado do BDT. Pode indicar que o motorista abasteceu durante um trajeto que não foi declarado, que adulterou o hodômetro no preenchimento ou que fez a recarga para dias seguintes. Verificar se o motorista consumiu durante o salto.Qualquer combustível gasto durante um salto deve ser reposto pelo motorista, já que indica uso pessoal do veículo."
     },
     "FRD-ABS02": {
-        "titulo": "🚨 [FRD-ABS02] A Fraude de Tempo",
+        "titulo": "🚨 [FRD-ABS02] Fraude de Horário",
         "detalhe": "A QUILOMETRAGEM do hodômetro do abastecimento condiz com uma das viagens do bdt, mas a HORA do abastecimento ocorreu fora da janela de tempo em que essa mesma viagem aconteceu. Indica adulteração do horário ou do hodômetro. Verificar se o motorista tem justificativa para essa inconsistência, ou se preencheu o bdt incorretamente."
     },
     "FRD-CNS01": {
