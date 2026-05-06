@@ -9,11 +9,9 @@ from datetime import datetime, timedelta
 CONFIGURACOES = {
     "margem_km_erro_digitação": 1.0,     # Até 1km negativo pode ser perdoado como erro visual do painel
     "margem_km_salto_aceitavel": 5.0,    # Até 5km de salto perdoados (estacionamento, volta na quadra)
-    "margem_minutos_jornada": 120,        # Tolerância antes das 08h ou depois das 18h (em minutos)
+    "margem_minutos_jornada": 120,       # Tolerância antes das 08h ou depois das 18h (em minutos)
     "horas_trabalho_dia": 8.0,           # Meta de horas por dia
     "horas_extra_limite": 2.0,           # Acima de 10h (8+2) o sistema reclama de jornada excessiva
-    "horas_descanso_minimo": 6.0,        # Menos que isso entre um dia e outro é suspeito se houver KM alto
-    "km_salto_madrugada_suspeito": 15.0, # KM mínimo para disparar alerta na madrugada
     "margem_minutos_posto": 15,          # Diferença aceitável entre o relógio da bomba e do carro
     "consumo_esperado_km_l": 10.0,       # Consumo médio esperado do veículo (Ex: 10 km por litro)
     "margem_tolerancia_consumo": 2.5,    # Aceita oscilar entre 7.5 km/L e 12.5 km/L (trânsito, ar condicionado)
@@ -45,10 +43,6 @@ TEXTOS_AUDITORIA = {
     "ALT-SLT01": {
         "titulo": "🟡 [ALT-SLT01] Salto de Hodômetro Não Registrado",
         "detalhe": "Existe uma quilometragem faltante entre o fim da última viagem e o início desta. Pode indicar uso do veículo para fins pessoais ou esquecimento de registro, não é necessariamente um problema, mas merece atenção para entender o motivo do salto."
-    },
-    "FRD-MAD01": {
-        "titulo": "🚨 [FRD-MAD01] Inconsistência de Descanso e KM",
-        "detalhe": "O período de descanso entre a noite anterior e a manhã atual foi muito curto e, ao mesmo tempo, o veículo sofreu um grande salto de KM. Indicativo grave de que o veículo rodou longas distâncias durante a madrugada sem registro."
     },
     "FRD-ABS01": {
         "titulo": "🚨 [FRD-ABS01] Abastecimento durante Salto",
@@ -153,11 +147,6 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                 km_total_nao_registrado += salto
                 alertas.append(criar_alerta("ALT-SLT01", f"Salto de {salto:.1f}km entre a viagem passada e o início da viagem do DIA {dia}."))
                 
-                if valido_tempo and viagem_anterior['valido_tempo']:
-                    horas_descanso = (data_in - viagem_anterior['data_out']).total_seconds() / 3600.0
-                    if horas_descanso > 0 and horas_descanso < CONFIGURACOES["horas_descanso_minimo"] and salto > CONFIGURACOES["km_salto_madrugada_suspeito"]:
-                        alertas.append(criar_alerta("FRD-MAD01", f"Descanso de apenas {horas_descanso:.1f}h com salto não justificado de {salto:.1f}km antes de iniciar o DIA {dia}."))
-
                 for comb in dados_combustivel:
                     km_bomba = float(comb['km_bomba'])
                     if viagem_anterior['km_out'] < km_bomba < km_in:
