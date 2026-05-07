@@ -14,10 +14,12 @@ CONFIGURACOES = {
     "horas_extra_limite": 2.0,           # Acima de 10h (8+2) o sistema reclama de jornada excessiva
     "margem_minutos_posto": 15,          # Diferença aceitável entre o relógio da bomba e do carro
     "consumo_esperado_km_l": 10.0,       # Consumo médio esperado do veículo (Ex: 10 km por litro)
-    "margem_tolerancia_consumo": 2.5,    # Aceita oscilar entre 7.5 km/L e 12.5 km/L (trânsito, ar condicionado)
+    "margem_tolerancia_consumo": 2.5,    # Aceita oscilar entre 7.5 km/L e 12.5 km/L
+    "velocidade_maxima_permitida_kmh": 200.0, # Velocidade média máxima aceitável antes de considerar erro
     
-    # NOVA CONFIGURAÇÃO DE VELOCIDADE
-    "velocidade_maxima_permitida_kmh": 200.0 # Velocidade média máxima aceitável antes de considerar Inconsistencia ou erro
+    # NOVA CONFIGURAÇÃO MAPS: TOLERÂNCIA DINÂMICA
+    "margem_tolerancia_maps_percentual": 0.30, # 30% a mais que a rota do Maps é perdoado
+    "margem_tolerancia_maps_minima_km": 2.5    # PISO MÍNIMO: Garante PELO MENOS 2.5km de perdão para ruas sem número
 }
 
 # =========================================================================
@@ -42,23 +44,27 @@ TEXTOS_AUDITORIA = {
     },
     "ALT-SLT01": {
         "titulo": "🟡 [ALT-SLT01] Salto de Hodômetro Não Registrado",
-        "detalhe": "Existe uma quilometragem faltante entre o fim da última viagem e o início desta. Pode indicar uso do veículo para fins pessoais ou esquecimento de registro, não é necessariamente um problema, mas merece atenção para entender o motivo do salto."
+        "detalhe": "Existe uma quilometragem faltante entre o fim da última viagem e o início desta. Pode indicar esquecimento de registro, não é necessariamente um problema, mas merece atenção para entender o motivo do salto."
     },
     "INC-ABS01": {
         "titulo": "🚨 [INC-ABS01] Abastecimento durante Salto",
-        "detalhe": "Um abastecimento com o cartão de recarga foi detectado exatamente no intervalo de um salto não registrado do BDT. Pode indicar que o motorista abasteceu durante um trajeto que não foi declarado, que adulterou o hodômetro no preenchimento ou que fez a recarga para dias seguintes. Verificar se o motorista consumiu durante o salto. Qualquer combustível gasto durante um salto deve ser reposto pelo motorista, já que indica uso pessoal do veículo."
+        "detalhe": "Um abastecimento com o cartão de recarga foi detectado exatamente no intervalo de um salto não registrado do BDT. Pode indicar que o motorista abasteceu durante um trajeto que não foi declarado. Verificar a justificativa para o salto."
     },
     "INC-ABS02": {
-        "titulo": "🚨 [INC-ABS02] Inconsistência de Horário",
-        "detalhe": "A QUILOMETRAGEM do hodômetro do abastecimento condiz com uma das viagens do bdt, mas a HORA do abastecimento ocorreu fora da janela de tempo em que essa mesma viagem aconteceu. Indica adulteração do horário ou do hodômetro. Verificar se o motorista tem justificativa para essa inconsistência, ou se preencheu o bdt incorretamente."
+        "titulo": "🚨 [INC-ABS02] Inconsistência de Horário do Abastecimento",
+        "detalhe": "A QUILOMETRAGEM do hodômetro condiz com a viagem do bdt, mas a HORA do posto ocorreu fora da janela de tempo da viagem. Indica possível erro de anotação no horário ou no hodômetro."
     },
     "INC-CNS01": {
         "titulo": "🚨 [INC-CNS01] Consumo Anômalo de Combustível",
-        "detalhe": "A média de consumo calculada (KM/L) destoa da capacidade do veículo e da margem aceitável. Consumo excessivo indica possível desvio de combustível. Economia irreal indica viagens omitidas ou abastecimentos pagos por fora."
+        "detalhe": "A média de consumo calculada (KM/L) destoa fortemente da capacidade do veículo. Consumo muito baixo ou muito alto requer análise das notas e trajetos."
     },
     "INC-VEL01": {
-        "titulo": "🚨 [INC-VEL01] Velocidade Média Impossível",
-        "detalhe": "A velocidade média calculada para o trajeto ultrapassa o limite físico configurado, indicando erro grave na anotação do tempo da viagem, erro de digitação ou adulteração de hodômetro."
+        "titulo": "🚨 [INC-VEL01] Velocidade Média Incompatível",
+        "detalhe": "A velocidade média calculada para o trajeto ultrapassa o limite físico configurado, indicando erro grave na anotação do tempo da viagem ou erro de digitação do hodômetro."
+    },
+    "INC-MAP01": {
+        "titulo": "🚨 [INC-MAP01] Desvio de Rota (Acima do Maps)",
+        "detalhe": "A quilometragem registrada para esta viagem superou a distância do Maps somada à nossa margem de tolerância (30% ou 2.5km mínimos). Verificar se houve desvios não autorizados."
     }
 }
 
@@ -79,13 +85,12 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
     km_total_declarado = 0
     km_total_nao_registrado = 0
     
-    # Variáveis para a nova caixa de resumo geral
     distancia_util_velocidade = 0
     tempo_util_velocidade = 0
     consumo_real = 0
     
     viagem_anterior = None
-    jornada_diaria = {} # Para calcular as horas trabalhadas no dia
+    jornada_diaria = {} 
 
     for i, linha in enumerate(dados_bdt):
         dia = int(linha['dia'])
@@ -93,6 +98,26 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
         km_in, km_out = float(linha['km_in']), float(linha['km_out'])
         distancia = km_out - km_in
         km_total_declarado += distancia
+
+        # --- VERIFICAÇÃO INTELIGENTE DO MAPS ---
+        km_maps_str = str(linha.get('km_maps', '')).replace(',', '.')
+        if km_maps_str and km_maps_str.strip() != "":
+            try:
+                km_maps = float(km_maps_str)
+                if km_maps > 0:
+                    # Calcula 30% da viagem
+                    tolerancia_calculada = km_maps * CONFIGURACOES["margem_tolerancia_maps_percentual"]
+                    
+                    # Pega o que for maior: os 30% ou o piso mínimo (ex: 2.5km)
+                    tolerancia_final = max(tolerancia_calculada, CONFIGURACOES["margem_tolerancia_maps_minima_km"])
+                    limite_maps = km_maps + tolerancia_final
+                    
+                    if distancia > limite_maps:
+                        excesso = distancia - km_maps
+                        alertas.append(criar_alerta("INC-MAP01", f"No DIA {dia}, trajeto de {origem} a {destino} registrou {distancia:.1f}km. O Maps prevê ~{km_maps:.1f}km (Rodou {excesso:.1f}km a mais que o previsto)."))
+            except ValueError:
+                pass
+        # ---------------------------------------
 
         try:
             h_in = datetime.strptime(linha['hora_in'], "%H:%M").time()
@@ -112,20 +137,18 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
             alertas.append(criar_alerta("ERR-KM01", f"No DIA {dia}, KM de {origem} a {destino} está negativo ({km_in} para {km_out})."))
 
         if valido_tempo:
-            
             if distancia > 0:
                 horas_viagem = (data_out - data_in).total_seconds() / 3600.0
                 if horas_viagem > 0:
-                    # Somando para a média geral que vai aparecer na tela
                     distancia_util_velocidade += distancia
                     tempo_util_velocidade += horas_viagem
                     
                     velocidade_media = distancia / horas_viagem
                     if velocidade_media > CONFIGURACOES["velocidade_maxima_permitida_kmh"]:
                         minutos_viagem = horas_viagem * 60
-                        alertas.append(criar_alerta("INC-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em apenas {minutos_viagem:.0f} minutos. Velocidade média: {velocidade_media:.1f} km/h!"))
+                        alertas.append(criar_alerta("INC-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em {minutos_viagem:.0f} minutos. Média: {velocidade_media:.1f} km/h!"))
                 elif horas_viagem == 0:
-                    alertas.append(criar_alerta("INC-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em 0 minutos (Hora Inicio e Hora Fim são iguais). Velocidade infinita!"))
+                    alertas.append(criar_alerta("INC-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em 0 minutos. Velocidade impossível!"))
 
             if dia not in jornada_diaria:
                 jornada_diaria[dia] = {"primeiro_in": data_in, "ultimo_out": data_out}
@@ -174,15 +197,14 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                             pass
 
         viagem_anterior = {'km_out': km_out, 'valido_tempo': valido_tempo, 'data_out': data_out if valido_tempo else None}
-        logs_bdt.append({"Dia": dia, "Hora In": linha['hora_in'], "Hora Fim": linha['hora_out'], "Origem": origem, "Destino": destino, "KM Inicial": km_in, "KM Final": km_out, "Distância (km)": distancia})
+        logs_bdt.append({"Dia": dia, "Hora In": linha['hora_in'], "Hora Fim": linha['hora_out'], "Origem": origem, "Destino": destino, "KM Inicial": km_in, "KM Final": km_out, "Distância (km)": distancia, "KM Maps": km_maps_str})
 
     limite_horas = CONFIGURACOES["horas_trabalho_dia"] + CONFIGURACOES["horas_extra_limite"]
     for dia_jornada, dados_jornada in jornada_diaria.items():
         horas_trabalhadas = (dados_jornada["ultimo_out"] - dados_jornada["primeiro_in"]).total_seconds() / 3600.0
         if horas_trabalhadas > limite_horas:
-            alertas.append(criar_alerta("ALT-JRN02", f"No DIA {dia_jornada}, o motorista acumulou uma jornada total de {horas_trabalhadas:.1f} horas."))
+            alertas.append(criar_alerta("ALT-JRN02", f"No DIA {dia_jornada}, jornada total de {horas_trabalhadas:.1f} horas."))
 
-    # Cálculos Finais para o Painel Geral
     velocidade_media_geral = 0
     if tempo_util_velocidade > 0:
         velocidade_media_geral = distancia_util_velocidade / tempo_util_velocidade
@@ -199,17 +221,13 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
             margem = CONFIGURACOES["margem_tolerancia_consumo"]
             
             if consumo_real < (consumo_esp - margem):
-                alertas.append(criar_alerta("INC-CNS01", f"Veículo fez apenas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Desvio ou extração de combustível provável."))
+                alertas.append(criar_alerta("INC-CNS01", f"Veículo fez apenas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Desvio excessivo."))
             elif consumo_real > (consumo_esp + margem):
-                alertas.append(criar_alerta("INC-CNS01", f"Veículo fez irrealistas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Notas de abastecimento foram omitidas ou apagadas."))
+                alertas.append(criar_alerta("INC-CNS01", f"Veículo fez irrealistas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Notas omitidas ou erro de KM."))
 
-    # =========================================================================
-    # GERAÇÃO DO EXCEL PROFISSIONAL (COM RESUMO E FORMATAÇÃO)
-    # =========================================================================
     df_bdt = pd.DataFrame(logs_bdt)
     df_comb = pd.DataFrame(dados_combustivel)
     
-    # Transforma os alertas que estão em dicionário para um formato de tabela
     if alertas:
         df_alertas = pd.DataFrame([{
             "Grau": "🔴 Erro" if "🔴" in a["titulo"] else "🚨 Inconsistência" if "🚨" in a["titulo"] else "🟡 Alerta",
@@ -221,15 +239,14 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
     else:
         df_alertas = pd.DataFrame(columns=["Grau", "Código", "Descrição", "Ocorrência", "Ação Recomendada"])
     
-    # Cria a aba de Resumo Geral
     df_resumo = pd.DataFrame({
         "Indicador": ["Distância Declarada (BDT)", "Distância Omitida (Saltos)", "Total Rodado Real", "Velocidade Média Geral", "Consumo Médio Calculado"],
         "Valor": [
             f"{km_total_declarado:.1f} km", 
             f"{km_total_nao_registrado:.1f} km", 
             f"{(km_total_declarado + km_total_nao_registrado):.1f} km", 
-            f"{velocidade_media_geral:.1f} km/h" if 'velocidade_media_geral' in locals() else "0 km/h", 
-            f"{consumo_real:.1f} km/L" if 'consumo_real' in locals() else "0 km/L"
+            f"{velocidade_media_geral:.1f} km/h", 
+            f"{consumo_real:.1f} km/L"
         ]
     })
 
@@ -241,7 +258,6 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
         if not df_comb.empty:
             df_comb.to_excel(writer, sheet_name='Abastecimentos', index=False)
         
-        # O pulo do gato: Acessar a planilha gerada para esticar as colunas automaticamente!
         workbook = writer.book
         for sheet_name in workbook.sheetnames:
             worksheet = workbook[sheet_name]
@@ -252,11 +268,8 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
-                        pass
-                adjusted_width = (max_length + 4)
-                # Trava um limite máximo para textos muito grandes (como a Ação Recomendada) não quebrarem a tela
-                worksheet.column_dimensions[column].width = min(adjusted_width, 80) 
+                    except: pass
+                worksheet.column_dimensions[column].width = min((max_length + 4), 80) 
 
     excel_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
@@ -265,8 +278,8 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
         "km_declarado": km_total_declarado,
         "km_nao_registrado": km_total_nao_registrado,
         "total_rodado": km_total_declarado + km_total_nao_registrado,
-        "velocidade_media": velocidade_media_geral if 'velocidade_media_geral' in locals() else 0,
-        "consumo": consumo_real if 'consumo_real' in locals() else 0,
+        "velocidade_media": velocidade_media_geral,
+        "consumo": consumo_real,
         "alertas": alertas,
         "excel_b64": excel_b64
     }

@@ -23,7 +23,7 @@
         th.th-parada { background-color: #17a2b8; } 
         
         input { width: 100%; border: none; padding: 12px; box-sizing: border-box; outline: none; background: transparent; font-size: 14px; }
-        input[type="time"] { font-family: monospace; font-size: 15px; } /* Ajuste pra hora ficar bonita */
+        input[type="time"] { font-family: monospace; font-size: 15px; }
         input:focus { background-color: #e8f0fe; box-shadow: inset 0 -2px 0 #0056b3; }
         ::placeholder { color: #aaa; font-style: italic; }
         
@@ -33,11 +33,10 @@
         .btn-auditar { margin-top: 20px; padding: 12px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold;}
         .btn-auditar:hover { background-color: #218838; }
 
-        /* NOVOS ESTILOS PARA O RELATÓRIO AGRUPADO */
         details { background: white; border: 1px solid #eee; margin-bottom: 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         details > summary { padding: 12px; cursor: pointer; font-weight: bold; outline: none; list-style: none; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
         details > summary:hover { background-color: #f8f9fa; }
-        details > summary::-webkit-details-marker { display: none; } /* Esconde setinha padrão */
+        details > summary::-webkit-details-marker { display: none; }
         details[open] > summary { border-bottom: 1px solid #eee; background-color: #f8f9fa; }
         .setinha { font-size: 12px; color: #666; transition: transform 0.2s; }
         details[open] .setinha { transform: rotate(180deg); }
@@ -67,18 +66,18 @@
         </div>
     </div>
 
-    <!-- BDT -->
     <div id="aba-bdt" class="tab-content active">
         <table id="bdtTable">
             <thead>
                 <tr>
                     <th width="6%">Dia</th>
                     <th width="10%">Hora In.</th>
-                    <th width="12%">KM Inicial</th>
-                    <th width="20%">Origem</th>
-                    <th width="20%" class="th-destino">Destino</th>
+                    <th width="10%">KM Inicial</th>
+                    <th width="17%">Origem</th>
+                    <th width="17%" class="th-destino">Destino</th>
                     <th width="10%">Hora Fim</th>
-                    <th width="12%">KM Final</th>
+                    <th width="10%">KM Final</th>
+                    <th width="15%">KM Maps (Opc.)</th>
                     <th width="5%" style="text-align: center;">Ação</th>
                 </tr>
             </thead>
@@ -87,17 +86,17 @@
                     <td><input type="number" class="dia" placeholder="Dia"></td>
                     <td><input type="time" class="hora-in"></td>
                     <td><input type="number" step="0.1" class="km-in" placeholder="KM In"></td>
-                    <td><input type="text" class="origem" placeholder="Origem"></td>
-                    <td class="td-destino"><input type="text" class="destino" placeholder="Destino"></td>
+                    <td><input type="text" class="origem" placeholder="Origem" oninput="sincronizarCacheMaps(this)"></td>
+                    <td class="td-destino"><input type="text" class="destino" placeholder="Destino" oninput="sincronizarCacheMaps(this)"></td>
                     <td><input type="time" class="hora-out"></td>
                     <td><input type="number" step="0.1" class="km-out" placeholder="KM Out"></td>
+                    <td><input type="number" step="0.1" class="km-maps" placeholder="Ex: 25.5" oninput="sincronizarCacheMaps(this)"></td>
                     <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
                 </tr>
             </tbody>
         </table>
     </div>
 
-    <!-- COMBUSTÍVEL -->
     <div id="aba-combustivel" class="tab-content">
         <div style="margin-bottom: 15px; text-align: right;">
             <input type="file" id="upload-pdf" accept=".pdf" style="display: none;" onchange="importarPDF(event)">
@@ -127,7 +126,6 @@
     
     <button class="btn-auditar" onclick="enviarParaAuditoria()">🔍 Rodar Auditoria Completa</button>
 
-    <!-- BOX DE RELATORIO MANTIDO IGUAL -->
     <div id="box-relatorio" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px;">
         <h3 style="margin-top: 0; color: #333;">📊 Relatório de Auditoria</h3>
         
@@ -161,6 +159,47 @@
 </div>
 
 <script>
+    // --- CACHE DE MEMÓRIA (MAPS) ---
+    const cacheDeRotasMaps = {};
+
+    function sincronizarCacheMaps(elementoAlterado) {
+        const linhaAtual = elementoAlterado.closest('tr');
+        const inputOrigem = linhaAtual.querySelector('.origem');
+        const inputDestino = linhaAtual.querySelector('.destino');
+        const inputMapsAtual = linhaAtual.querySelector('.km-maps');
+
+        if (!inputOrigem || !inputDestino || !inputMapsAtual) return;
+
+        const origem = inputOrigem.value.trim().toUpperCase();
+        const destino = inputDestino.value.trim().toUpperCase();
+
+        if (!origem || !destino) return;
+
+        const chaveDaRota = origem + " -> " + destino;
+
+        if (elementoAlterado.classList.contains('km-maps')) {
+            const valorDigitado = inputMapsAtual.value;
+            if (valorDigitado) {
+                cacheDeRotasMaps[chaveDaRota] = valorDigitado;
+                
+                document.querySelectorAll('#bdtTable tbody tr').forEach(tr => {
+                    const o = (tr.querySelector('.origem')?.value || '').trim().toUpperCase();
+                    const d = (tr.querySelector('.destino')?.value || '').trim().toUpperCase();
+                    const inputOutro = tr.querySelector('.km-maps');
+                    
+                    if (o === origem && d === destino && inputOutro && inputOutro !== inputMapsAtual) {
+                        if (!inputOutro.value) inputOutro.value = valorDigitado;
+                    }
+                });
+            }
+        } else {
+            if (cacheDeRotasMaps[chaveDaRota] && !inputMapsAtual.value) {
+                inputMapsAtual.value = cacheDeRotasMaps[chaveDaRota];
+            }
+        }
+    }
+
+    // --- FUNÇÕES GERAIS ---
     function abrirAba(evento, idAba) {
         document.querySelectorAll('.tab-content').forEach(aba => aba.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -230,11 +269,12 @@
             <td><input type="number" class="dia" placeholder="${sugestaoDia}" data-sugestao="${sugestaoDia}"></td>
             <td><input type="time" class="hora-in" placeholder="${sugestaoHoraIn}" data-sugestao="${sugestaoHoraIn}"></td>
             <td><input type="number" step="0.1" class="km-in" placeholder="${sugestaoKmIn}" data-sugestao="${sugestaoKmIn}"></td>
-            <td><input type="text" class="origem" placeholder="${sugestaoOrigem}" data-sugestao="${sugestaoOrigem}"></td>
+            <td><input type="text" class="origem" placeholder="${sugestaoOrigem}" data-sugestao="${sugestaoOrigem}" oninput="sincronizarCacheMaps(this)"></td>
             ${tdsParadas}
-            <td class="td-destino"><input type="text" class="destino"></td>
+            <td class="td-destino"><input type="text" class="destino" oninput="sincronizarCacheMaps(this)"></td>
             <td><input type="time" class="hora-out"></td>
             <td><input type="number" step="0.1" class="km-out"></td>
+            <td><input type="number" step="0.1" class="km-maps" placeholder="Ex: 25.5" oninput="sincronizarCacheMaps(this)"></td>
             <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
         `;
         document.querySelector('#bdtTable tbody').appendChild(tr);
@@ -254,7 +294,6 @@
         return tr;
     }
 
-    // --- NOVIDADE: FUNÇÃO CENTRAL DA INTELIGÊNCIA PREDITIVA ---
     function atualizarSugestaoDestino(trAtual) {
         const inputOrigem = trAtual.querySelector('.origem');
         const inputDestino = trAtual.querySelector('.destino');
@@ -265,13 +304,12 @@
 
         const linhas = Array.from(document.querySelectorAll('#bdtTable tbody tr'));
         const indexAtual = linhas.indexOf(trAtual);
-        if (indexAtual <= 0) return; // Se for a primeira linha, não tem passado para olhar
+        if (indexAtual <= 0) return;
 
         const contagemDestinos = {};
         let maxOcorrencias = 0;
         let destinoMaisComum = "";
 
-        // Analisa o histórico de cima para baixo
         for (let i = 0; i < indexAtual; i++) {
             const origemPassada = linhas[i].querySelector('.origem').value.trim().toUpperCase();
             const destinoPassado = linhas[i].querySelector('.destino').value.trim();
@@ -288,30 +326,25 @@
             }
         }
 
-        // Se a inteligência achou um padrão com a MESMA origem, injeta ele. 
         if (destinoMaisComum !== "") {
             inputDestino.placeholder = destinoMaisComum;
             inputDestino.dataset.sugestao = destinoMaisComum;
         } else {
-            // Se não tem histórico dessa origem, não sugere NADA!
             inputDestino.placeholder = "Destino";
             inputDestino.dataset.sugestao = "";
         }
     }
 
-    // Mantém a atualização enquanto o usuário digita fisicamente
     document.addEventListener('input', function(e) {
         if (e.target.classList.contains('origem')) {
             atualizarSugestaoDestino(e.target.closest('tr'));
         }
     });
 
-    // --- TECLADO MESTRE ---
     document.addEventListener('keydown', function(e) {
         const inputAtual = e.target;
         if (inputAtual.tagName !== 'INPUT') return;
 
-        // Regra Esc
         if (e.key === 'Escape' && inputAtual.value === '') {
             e.preventDefault();
             const trAtual = inputAtual.closest('tr');
@@ -321,7 +354,6 @@
             return;
         }
 
-        // Regra Backspace
         if (e.key === 'Backspace') {
             if (e.shiftKey) {
                 e.preventDefault();
@@ -337,7 +369,6 @@
             }
         }
 
-        // Regra Enter
         if (e.key === 'Enter') {
             e.preventDefault();
             
@@ -347,13 +378,12 @@
                 return;
             }
 
-            // Aceita a Sugestão
             if (inputAtual.value === '' && inputAtual.dataset.sugestao) {
                 inputAtual.value = inputAtual.dataset.sugestao;
+                // Como ele aceitou a sugestão de destino, verificamos se o cache de KM precisa agir
+                if(inputAtual.classList.contains('destino')) sincronizarCacheMaps(inputAtual);
             }
 
-            // --- A MÁGICA ACONTECE AQUI ---
-            // Se ele acabou de dar Enter na Origem (aceitando ou não a sugestão), dispara a inteligência!
             if (inputAtual.classList.contains('origem')) {
                 atualizarSugestaoDestino(inputAtual.closest('tr'));
             }
@@ -374,7 +404,6 @@
                         const destinoAtual = trAtual.querySelector('.destino').value;
                         const kmFinalAtual = trAtual.querySelector('.km-out').value;
                         
-                        // Passa o Destino atual como Sugestão de Origem da próxima linha
                         proximaTr = criarNovaLinhaBDT(diaAtual, horaInAtual, destinoAtual, kmFinalAtual);
                     } else if (tabelaId === 'combTable') {
                         proximaTr = criarNovaLinhaComb();
@@ -385,7 +414,6 @@
         }
     });
 
-    // --- ENVIO DE DADOS ---
     async function enviarParaAuditoria() {
         const payload = { bdt: [], combustivel: [] };
         let bloqueiaEnvio = false;
@@ -416,7 +444,8 @@
                     origem: linha.querySelector('.origem').value, 
                     destino: destinoFinal, 
                     km_in: linha.querySelector('.km-in').value, 
-                    km_out: linha.querySelector('.km-out').value 
+                    km_out: linha.querySelector('.km-out').value,
+                    km_maps: (linha.querySelector('.km-maps') ? linha.querySelector('.km-maps').value : "") // Capturando o novo dado
                 });
             }
         });
@@ -449,7 +478,6 @@
             document.getElementById('res-km-salto').innerText = resultado.km_nao_registrado.toFixed(1) + " km";
             document.getElementById('res-km-total').innerText = resultado.total_rodado.toFixed(1) + " km";
 
-            // INJETANDO OS NOVOS DADOS
             document.getElementById('res-vel-media').innerText = (resultado.velocidade_media > 0 ? resultado.velocidade_media.toFixed(1) : "0") + " km/h";
             document.getElementById('res-consumo').innerText = (resultado.consumo > 0 ? resultado.consumo.toFixed(1) : "0") + " km/L";
 
@@ -457,62 +485,46 @@
             divAlertas.innerHTML = ""; 
             
             if (resultado.alertas.length > 0) {
-                // 1. Dicionário base para separar e agrupar
                 const categorias = {
                     'INC': { nome: "🚨 INCONSISTÊNCIAS", corHeader: "#dc3545", corBg: "#fff5f5", itens: {} },
                     'ERR': { nome: "🔴 ERROS", corHeader: "#fd7e14", corBg: "#fff9f4", itens: {} },
                     'ALT': { nome: "🟡 ALERTAS", corHeader: "#ffc107", corBg: "#fffdf5", corTexto: "#333", itens: {} }
                 };
 
-                // 2. Varrer os alertas e empilhar dentro dos códigos correspondentes
                 resultado.alertas.forEach(alerta => {
-                    const prefixo = alerta.codigo.substring(0, 3); // Extrai 'INC', 'ERR' ou 'ALT'
-                    
+                    const prefixo = alerta.codigo.substring(0, 3);
                     if(categorias[prefixo]) {
-                        // Se o alerta desse código ainda não existe no grupo, cria a gaveta
                         if(!categorias[prefixo].itens[alerta.codigo]) {
-                            categorias[prefixo].itens[alerta.codigo] = {
-                                titulo: alerta.titulo,
-                                detalhe: alerta.detalhe,
-                                ocorrencias: []
-                            };
+                            categorias[prefixo].itens[alerta.codigo] = { titulo: alerta.titulo, detalhe: alerta.detalhe, ocorrencias: [] };
                         }
-                        // Empilha a linha de ocorrência dentro da gaveta
                         categorias[prefixo].itens[alerta.codigo].ocorrencias.push(alerta.resumo);
                     }
                 });
 
-                // 3. Desenhar a tela categoria por categoria
                 ['INC', 'ERR', 'ALT'].forEach(prefixo => {
                     const categoria = categorias[prefixo];
                     const codigos = Object.keys(categoria.itens);
 
                     if (codigos.length > 0) {
-                        // Criar a caixa maior da Categoria (Ex: A caixa vermelha de Inconsistências)
                         const catDiv = document.createElement('div');
                         catDiv.style.cssText = `margin-bottom: 25px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;`;
 
-                        // Somar total de incidências dentro desta categoria
                         let totalIncidencias = 0;
                         codigos.forEach(c => totalIncidencias += categoria.itens[c].ocorrencias.length);
 
-                        // Cabeçalho da Categoria
                         const catHeader = document.createElement('div');
                         catHeader.style.cssText = `background: ${categoria.corHeader}; color: ${categoria.corTexto || 'white'}; padding: 12px 15px; font-weight: bold; font-size: 16px;`;
                         catHeader.innerText = `${categoria.nome} (${totalIncidencias} eventos detectados)`;
                         catDiv.appendChild(catHeader);
 
-                        // Fundo da categoria
                         const catContent = document.createElement('div');
                         catContent.style.cssText = `padding: 15px; background: ${categoria.corBg};`;
 
-                        // Criar os agrupadores expansíveis (Accordions) por código de erro
                         codigos.forEach(codigo => {
                             const item = categoria.itens[codigo];
                             const qtd = item.ocorrencias.length;
 
                             const details = document.createElement('details');
-                            // Ex: " (9) 🟡 [ALT-JRN02] Jornada Diária Excessiva"
                             details.innerHTML = `
                                 <summary>
                                     <span style="display: flex; align-items: center; gap: 10px;">
@@ -549,7 +561,6 @@
         } catch (erro) { console.error("Erro na comunicação:", erro); }
     }
 
-    // Importações de PDF e Excel mantidas iguais (omiti por brevidade, pode manter as suas que estão prontas no fim do arquivo)
     async function importarExcel(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -563,10 +574,8 @@
                 document.querySelector('#bdtTable tbody').innerHTML = '';
                 document.querySelector('#combTable tbody').innerHTML = '';
                 
-                // --- NOVIDADE: ENGENHARIA REVERSA DAS PARADAS ---
                 let maxParadas = 0;
                 
-                // 1. Descobre qual é o número máximo de paradas nesta planilha
                 if (resultado.bdt && resultado.bdt.length > 0) {
                     resultado.bdt.forEach(linha => {
                         if (linha.destino && linha.destino.includes(' ➔ ')) {
@@ -576,7 +585,6 @@
                     });
                 }
 
-                // 2. Limpa o cabeçalho antigo e cria as colunas exatas de paradas
                 document.querySelectorAll('#bdtTable thead th.th-parada').forEach(th => th.remove());
                 const theadTr = document.querySelector('#bdtTable thead tr');
                 const thDestino = theadTr.querySelector('.th-destino');
@@ -587,23 +595,20 @@
                     theadTr.insertBefore(novoTh, thDestino);
                 }
                 
-                // 3. Preenche as linhas do BDT quebrando a seta
                 if(resultado.bdt.length > 0) {
                     resultado.bdt.forEach(linha => {
                         let paradasTexto = [];
                         let destinoFinal = linha.destino;
                         
-                        // Se tem seta, divide o texto!
                         if (linha.destino && linha.destino.includes(' ➔ ')) {
                             const partes = linha.destino.split(' ➔ ');
-                            destinoFinal = partes.pop(); // O último item é o Destino Final
-                            paradasTexto = partes;       // O resto vira parada
+                            destinoFinal = partes.pop();
+                            paradasTexto = partes;
                         }
 
-                        // Monta os inputs das paradas
                         let tdsParadas = '';
                         for (let i = 0; i < maxParadas; i++) {
-                            const valor = paradasTexto[i] || ''; // Se essa linha tiver menos paradas que a máxima, fica vazio
+                            const valor = paradasTexto[i] || '';
                             tdsParadas += `<td><input type="text" class="parada" placeholder="Parada ${i+1}" value="${valor}"></td>`;
                         }
 
@@ -612,20 +617,20 @@
                             <td><input type="number" class="dia" value="${linha.dia}"></td>
                             <td><input type="time" class="hora-in" value="${linha.hora_in}"></td>
                             <td><input type="number" step="0.1" class="km-in" value="${linha.km_in}"></td>
-                            <td><input type="text" class="origem" value="${linha.origem}"></td>
+                            <td><input type="text" class="origem" value="${linha.origem}" oninput="sincronizarCacheMaps(this)"></td>
                             ${tdsParadas}
-                            <td class="td-destino"><input type="text" class="destino" value="${destinoFinal}"></td>
+                            <td class="td-destino"><input type="text" class="destino" value="${destinoFinal}" oninput="sincronizarCacheMaps(this)"></td>
                             <td><input type="time" class="hora-out" value="${linha.hora_out}"></td>
                             <td><input type="number" step="0.1" class="km-out" value="${linha.km_out}"></td>
+                            <td><input type="number" step="0.1" class="km-maps" value="${linha['KM Maps'] || linha.km_maps || ''}" placeholder="Ex: 25.5" oninput="sincronizarCacheMaps(this)"></td>
                             <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
                         `;
                         document.querySelector('#bdtTable tbody').appendChild(tr);
                     });
                 } else {
-                    criarNovaLinhaBDT(); // Cria uma vazia se não vier dados
+                    criarNovaLinhaBDT(); 
                 }
 
-                // 4. Preenche a tabela de Combustível (MANTIDO IGUAL)
                 if(resultado.combustivel && resultado.combustivel.length > 0) {
                     resultado.combustivel.forEach(linha => {
                         const tr = document.createElement('tr');
@@ -693,27 +698,19 @@
     }
 
     async function gerarPDF() {
-        // Pegamos os resultados da última auditoria que guardamos na memória do JS 
-        // ou simplesmente pegamos o que está escrito na tela
         const dadosRelatorio = {
             km_declarado: document.getElementById('res-km-declarado').innerText,
             km_salto: document.getElementById('res-km-salto').innerText,
             km_total: document.getElementById('res-km-total').innerText,
             vel_media: document.getElementById('res-vel-media').innerText,
             consumo: document.getElementById('res-consumo').innerText,
-            // Pegamos os alertas do DOM para manter o agrupamento
             alertas: [] 
         };
 
-        // Buscamos os alertas no HTML para o PDF sair igual à tela
-        // CORREÇÃO: Usar .textContent ao invés de .innerText para ler os textos "escondidos"
         document.querySelectorAll('details').forEach(det => {
             const titulo = det.querySelector('summary').textContent.replace('▼', '').trim();
-            
-            // Pega as ocorrências mesmo com a gaveta fechada
             const ocorrencias = Array.from(det.querySelectorAll('li')).map(li => li.textContent.trim());
             
-            // Pega a recomendação e limpa a palavra "Detalhe/Recomendação:" que já vinha junto
             let detalhe = det.querySelector('p i').textContent;
             detalhe = detalhe.replace('Detalhe/Recomendação:', '').trim();
 
@@ -744,7 +741,6 @@
             btn.innerText = "📄 Gerar Relatório PDF Profissional";
         }
     }
-
 </script>
 
 </body>
