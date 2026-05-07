@@ -459,14 +459,14 @@
             if (resultado.alertas.length > 0) {
                 // 1. Dicionário base para separar e agrupar
                 const categorias = {
-                    'FRD': { nome: "🚨 FRAUDES E INFRAÇÕES GRAVES", corHeader: "#dc3545", corBg: "#fff5f5", itens: {} },
-                    'ERR': { nome: "🔴 ERROS CRÍTICOS", corHeader: "#fd7e14", corBg: "#fff9f4", itens: {} },
-                    'ALT': { nome: "🟡 ALERTAS COMPORTAMENTAIS", corHeader: "#ffc107", corBg: "#fffdf5", corTexto: "#333", itens: {} }
+                    'INC': { nome: "🚨 INCONSISTÊNCIAS", corHeader: "#dc3545", corBg: "#fff5f5", itens: {} },
+                    'ERR': { nome: "🔴 ERROS", corHeader: "#fd7e14", corBg: "#fff9f4", itens: {} },
+                    'ALT': { nome: "🟡 ALERTAS", corHeader: "#ffc107", corBg: "#fffdf5", corTexto: "#333", itens: {} }
                 };
 
                 // 2. Varrer os alertas e empilhar dentro dos códigos correspondentes
                 resultado.alertas.forEach(alerta => {
-                    const prefixo = alerta.codigo.substring(0, 3); // Extrai 'FRD', 'ERR' ou 'ALT'
+                    const prefixo = alerta.codigo.substring(0, 3); // Extrai 'INC', 'ERR' ou 'ALT'
                     
                     if(categorias[prefixo]) {
                         // Se o alerta desse código ainda não existe no grupo, cria a gaveta
@@ -483,12 +483,12 @@
                 });
 
                 // 3. Desenhar a tela categoria por categoria
-                ['FRD', 'ERR', 'ALT'].forEach(prefixo => {
+                ['INC', 'ERR', 'ALT'].forEach(prefixo => {
                     const categoria = categorias[prefixo];
                     const codigos = Object.keys(categoria.itens);
 
                     if (codigos.length > 0) {
-                        // Criar a caixa maior da Categoria (Ex: A caixa vermelha de Fraudes)
+                        // Criar a caixa maior da Categoria (Ex: A caixa vermelha de Inconsistências)
                         const catDiv = document.createElement('div');
                         catDiv.style.cssText = `margin-bottom: 25px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;`;
 

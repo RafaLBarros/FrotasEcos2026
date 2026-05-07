@@ -17,7 +17,7 @@ CONFIGURACOES = {
     "margem_tolerancia_consumo": 2.5,    # Aceita oscilar entre 7.5 km/L e 12.5 km/L (trânsito, ar condicionado)
     
     # NOVA CONFIGURAÇÃO DE VELOCIDADE
-    "velocidade_maxima_permitida_kmh": 200.0 # Velocidade média máxima aceitável antes de considerar fraude ou erro
+    "velocidade_maxima_permitida_kmh": 200.0 # Velocidade média máxima aceitável antes de considerar Inconsistencia ou erro
 }
 
 # =========================================================================
@@ -44,20 +44,20 @@ TEXTOS_AUDITORIA = {
         "titulo": "🟡 [ALT-SLT01] Salto de Hodômetro Não Registrado",
         "detalhe": "Existe uma quilometragem faltante entre o fim da última viagem e o início desta. Pode indicar uso do veículo para fins pessoais ou esquecimento de registro, não é necessariamente um problema, mas merece atenção para entender o motivo do salto."
     },
-    "FRD-ABS01": {
-        "titulo": "🚨 [FRD-ABS01] Abastecimento durante Salto",
+    "INC-ABS01": {
+        "titulo": "🚨 [INC-ABS01] Abastecimento durante Salto",
         "detalhe": "Um abastecimento com o cartão de recarga foi detectado exatamente no intervalo de um salto não registrado do BDT. Pode indicar que o motorista abasteceu durante um trajeto que não foi declarado, que adulterou o hodômetro no preenchimento ou que fez a recarga para dias seguintes. Verificar se o motorista consumiu durante o salto.Qualquer combustível gasto durante um salto deve ser reposto pelo motorista, já que indica uso pessoal do veículo."
     },
-    "FRD-ABS02": {
-        "titulo": "🚨 [FRD-ABS02] Fraude de Horário",
+    "INC-ABS02": {
+        "titulo": "🚨 [INC-ABS02] Inconsistência de Horário",
         "detalhe": "A QUILOMETRAGEM do hodômetro do abastecimento condiz com uma das viagens do bdt, mas a HORA do abastecimento ocorreu fora da janela de tempo em que essa mesma viagem aconteceu. Indica adulteração do horário ou do hodômetro. Verificar se o motorista tem justificativa para essa inconsistência, ou se preencheu o bdt incorretamente."
     },
-    "FRD-CNS01": {
-        "titulo": "🚨 [FRD-CNS01] Consumo Anômalo de Combustível",
+    "INC-CNS01": {
+        "titulo": "🚨 [INC-CNS01] Consumo Anômalo de Combustível",
         "detalhe": "A média de consumo calculada (KM/L) destoa da capacidade do veículo e da margem aceitável. Consumo excessivo indica possível desvio de combustível. Economia irreal indica viagens omitidas ou abastecimentos pagos por fora."
     },
-    "FRD-VEL01": {
-        "titulo": "🚨 [FRD-VEL01] Velocidade Média Impossível",
+    "INC-VEL01": {
+        "titulo": "🚨 [INC-VEL01] Velocidade Média Impossível",
         "detalhe": "A velocidade média calculada para o trajeto ultrapassa o limite físico configurado, indicando erro grave na anotação do tempo da viagem, erro de digitação ou adulteração de hodômetro."
     }
 }
@@ -123,9 +123,9 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                     velocidade_media = distancia / horas_viagem
                     if velocidade_media > CONFIGURACOES["velocidade_maxima_permitida_kmh"]:
                         minutos_viagem = horas_viagem * 60
-                        alertas.append(criar_alerta("FRD-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em apenas {minutos_viagem:.0f} minutos. Velocidade média: {velocidade_media:.1f} km/h!"))
+                        alertas.append(criar_alerta("INC-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em apenas {minutos_viagem:.0f} minutos. Velocidade média: {velocidade_media:.1f} km/h!"))
                 elif horas_viagem == 0:
-                    alertas.append(criar_alerta("FRD-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em 0 minutos (Hora Inicio e Hora Fim são iguais). Velocidade infinita!"))
+                    alertas.append(criar_alerta("INC-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em 0 minutos (Hora Inicio e Hora Fim são iguais). Velocidade infinita!"))
 
             if dia not in jornada_diaria:
                 jornada_diaria[dia] = {"primeiro_in": data_in, "ultimo_out": data_out}
@@ -150,7 +150,7 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                 for comb in dados_combustivel:
                     km_bomba = float(comb['km_bomba'])
                     if viagem_anterior['km_out'] < km_bomba < km_in:
-                        alertas.append(criar_alerta("FRD-ABS01", f"Abastecimento de {comb['litros']}L no DIA {comb['dia']} (KM {km_bomba}) no meio do salto não registrado de {salto:.1f}km!"))
+                        alertas.append(criar_alerta("INC-ABS01", f"Abastecimento de {comb['litros']}L no DIA {comb['dia']} (KM {km_bomba}) no meio do salto não registrado de {salto:.1f}km!"))
 
         if valido_tempo:
             for comb in dados_combustivel:
@@ -169,7 +169,7 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                             janela_out = data_out + timedelta(minutes=CONFIGURACOES["margem_minutos_posto"])
                             
                             if not (janela_in <= data_comb <= janela_out):
-                                alertas.append(criar_alerta("FRD-ABS02", f"No DIA {dia}, trajeto condiz com abastecimento, mas viagem ocorreu {h_in.strftime('%H:%M')}-{h_out.strftime('%H:%M')} e o posto registrou {comb['hora']}."))
+                                alertas.append(criar_alerta("INC-ABS02", f"No DIA {dia}, trajeto condiz com abastecimento, mas viagem ocorreu {h_in.strftime('%H:%M')}-{h_out.strftime('%H:%M')} e o posto registrou {comb['hora']}."))
                         except:
                             pass
 
@@ -199,9 +199,9 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
             margem = CONFIGURACOES["margem_tolerancia_consumo"]
             
             if consumo_real < (consumo_esp - margem):
-                alertas.append(criar_alerta("FRD-CNS01", f"Veículo fez apenas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Desvio ou extração de combustível provável."))
+                alertas.append(criar_alerta("INC-CNS01", f"Veículo fez apenas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Desvio ou extração de combustível provável."))
             elif consumo_real > (consumo_esp + margem):
-                alertas.append(criar_alerta("FRD-CNS01", f"Veículo fez irrealistas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Notas de abastecimento foram omitidas ou apagadas."))
+                alertas.append(criar_alerta("INC-CNS01", f"Veículo fez irrealistas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Notas de abastecimento foram omitidas ou apagadas."))
 
     # =========================================================================
     # GERAÇÃO DO EXCEL PROFISSIONAL (COM RESUMO E FORMATAÇÃO)
@@ -212,7 +212,7 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
     # Transforma os alertas que estão em dicionário para um formato de tabela
     if alertas:
         df_alertas = pd.DataFrame([{
-            "Grau": "🔴 Erro" if "🔴" in a["titulo"] else "🚨 Fraude" if "🚨" in a["titulo"] else "🟡 Alerta",
+            "Grau": "🔴 Erro" if "🔴" in a["titulo"] else "🚨 Inconsistência" if "🚨" in a["titulo"] else "🟡 Alerta",
             "Código": a["codigo"],
             "Descrição": a["titulo"].replace("🔴 ", "").replace("🚨 ", "").replace("🟡 ", ""),
             "Ocorrência": a["resumo"],

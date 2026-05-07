@@ -207,7 +207,7 @@ def api_gerar_pdf():
             cor_header = "#dc3545" # Vermelho (ERR)
             cor_texto_header = "white"
         if "🚨" in alerta['titulo']: 
-            cor_header = "#8b0000" # Vinho (FRD)
+            cor_header = "#8b0000" # Vinho (INC)
             cor_texto_header = "white"
 
         ocorrencias_html = "".join([f"<li class='alert-item'>{oc}</li>" for oc in alerta['ocorrencias']])

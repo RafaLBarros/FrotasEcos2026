@@ -1,0 +1,16 @@
+# Ambientes Virtuais
+venv/
+.venv/
+env/
+
+# Cache do Python e arquivos compilados
+__pycache__/
+*.pyc
+*.pyo
+
+# Arquivos de Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Pastas da extensão do VS Code
+.vscode/
