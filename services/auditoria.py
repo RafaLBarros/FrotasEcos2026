@@ -46,7 +46,7 @@ TEXTOS_AUDITORIA = {
     },
     "INC-ABS01": {
         "titulo": "🚨 [INC-ABS01] Abastecimento durante Salto",
-        "detalhe": "Um abastecimento com o cartão de recarga foi detectado exatamente no intervalo de um salto não registrado do BDT. Pode indicar que o motorista abasteceu durante um trajeto que não foi declarado, que adulterou o hodômetro no preenchimento ou que fez a recarga para dias seguintes. Verificar se o motorista consumiu durante o salto.Qualquer combustível gasto durante um salto deve ser reposto pelo motorista, já que indica uso pessoal do veículo."
+        "detalhe": "Um abastecimento com o cartão de recarga foi detectado exatamente no intervalo de um salto não registrado do BDT. Pode indicar que o motorista abasteceu durante um trajeto que não foi declarado, que adulterou o hodômetro no preenchimento ou que fez a recarga para dias seguintes. Verificar se o motorista consumiu durante o salto. Qualquer combustível gasto durante um salto deve ser reposto pelo motorista, já que indica uso pessoal do veículo."
     },
     "INC-ABS02": {
         "titulo": "🚨 [INC-ABS02] Inconsistência de Horário",
