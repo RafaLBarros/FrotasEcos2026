@@ -4,3 +4,4 @@ pandas
 openpyxl
 weasyprint
 xhtml2pdf
+gunicorn
