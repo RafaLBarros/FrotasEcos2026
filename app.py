@@ -5,12 +5,98 @@ from services.auditoria import rodar_auditoria_completa
 import fitz
 import re
 import io
+from database import (
+    listar_motoristas_ativos, listar_veiculos_ativos, 
+    salvar_motorista, salvar_veiculo,
+    editar_motorista, excluir_motorista,
+    editar_veiculo, excluir_veiculo,
+    salvar_jornada
+)
+
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/api/cadastros', methods=['GET'])
+def obter_cadastros():
+    motoristas = listar_motoristas_ativos()
+    veiculos = listar_veiculos_ativos()
+    
+    return jsonify({
+        "motoristas": motoristas,
+        "veiculos": veiculos
+    })
+
+@app.route('/api/motoristas/salvar', methods=['POST'])
+def api_salvar_motorista():
+    dados = request.get_json()
+    nome = dados.get('nome')
+    matricula = dados.get('matricula')
+    
+    sucesso, mensagem = salvar_motorista(nome, matricula)
+    
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": mensagem}), 200
+    else:
+        return jsonify({"status": "erro", "mensagem": mensagem}), 400
+
+@app.route('/api/veiculos/salvar', methods=['POST'])
+def api_salvar_veiculo():
+    dados = request.get_json()
+    sucesso, mensagem = salvar_veiculo(
+        dados.get('placa'), 
+        dados.get('modelo'), 
+        dados.get('ano'), 
+        dados.get('combustivel'), 
+        dados.get('especie'), 
+        dados.get('proprietario')
+    )
+    
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": mensagem}), 200
+    else:
+        return jsonify({"status": "erro", "mensagem": mensagem}), 400
+    
+# --- ROTAS DE CRUD: MOTORISTAS ---
+
+@app.route('/api/motoristas/excluir/<int:id_motorista>', methods=['DELETE'])
+def api_excluir_motorista(id_motorista):
+    sucesso, mensagem = excluir_motorista(id_motorista)
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": mensagem}), 200
+    return jsonify({"status": "erro", "mensagem": mensagem}), 400
+
+@app.route('/api/motoristas/editar/<int:id_motorista>', methods=['PUT'])
+def api_editar_motorista(id_motorista):
+    dados = request.get_json()
+    sucesso, mensagem = editar_motorista(id_motorista, dados.get('nome'), dados.get('matricula'))
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": mensagem}), 200
+    return jsonify({"status": "erro", "mensagem": mensagem}), 400
+
+# --- ROTAS DE CRUD: VEÍCULOS ---
+
+@app.route('/api/veiculos/excluir/<int:id_veiculo>', methods=['DELETE'])
+def api_excluir_veiculo(id_veiculo):
+    sucesso, mensagem = excluir_veiculo(id_veiculo)
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": mensagem}), 200
+    return jsonify({"status": "erro", "mensagem": mensagem}), 400
+
+@app.route('/api/veiculos/editar/<int:id_veiculo>', methods=['PUT'])
+def api_editar_veiculo(id_veiculo):
+    dados = request.get_json()
+    sucesso, mensagem = editar_veiculo(
+        id_veiculo, dados.get('placa'), dados.get('modelo'), 
+        dados.get('ano'), dados.get('combustivel'), 
+        dados.get('especie'), dados.get('proprietario')
+    )
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": mensagem}), 200
+    return jsonify({"status": "erro", "mensagem": mensagem}), 400
 
 @app.route('/api/auditar', methods=['POST'])
 def api_auditar():
@@ -278,6 +364,23 @@ def api_gerar_pdf():
     print(f"✅ PDF gerado com sucesso usando: {gerador_usado}")
 
     return send_file(pdf_io, mimetype='application/pdf', as_attachment=True, download_name="Auditoria_ECOS.pdf")
+
+@app.route('/api/viagens/salvar', methods=['POST'])
+def api_salvar_viagens():
+    dados = request.get_json()
+    id_motorista = dados.get('id_motorista')
+    id_veiculo = dados.get('id_veiculo')
+    viagens = dados.get('bdt', [])
+    alertas = dados.get('alertas', []) 
+    
+    if not viagens:
+        return jsonify({"status": "erro", "mensagem": "Nenhuma viagem encontrada para salvar."}), 400
+        
+    sucesso, mensagem = salvar_jornada(id_motorista, id_veiculo, viagens, alertas)
+    
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": mensagem}), 200
+    return jsonify({"status": "erro", "mensagem": mensagem}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
