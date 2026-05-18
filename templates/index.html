@@ -23,7 +23,7 @@
         th.th-parada { background-color: #17a2b8; } 
         
         input, select { width: 100%; border: none; padding: 12px; box-sizing: border-box; outline: none; background: transparent; font-size: 14px; }
-        input[type="time"] { font-family: monospace; font-size: 15px; }
+        input[type="time"], input[type="date"] { font-family: monospace; font-size: 14px; }
         input:focus, select:focus { background-color: #e8f0fe; box-shadow: inset 0 -2px 0 #0056b3; }
         ::placeholder { color: #aaa; font-style: italic; }
         
@@ -62,6 +62,35 @@
 </head>
 <body>
 
+<div id="modal-dev" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 25px; border-radius: 8px; width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0; color: #6f42c1;">🪄 Painel Dev: Importar BDT</h3>
+        <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Simule o preenchimento automático puxando o histórico do banco de dados.</p>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Motorista</label>
+            <select id="dev-motorista" style="background: #f4f4f9; border: 1px solid #ccc;"></select>
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Veículo</label>
+            <select id="dev-veiculo" style="background: #f4f4f9; border: 1px solid #ccc;"></select>
+        </div>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <div class="form-group" style="flex: 1;">
+                <label>Data Início</label>
+                <input type="date" id="dev-data-inicio" style="background: #f4f4f9; border: 1px solid #ccc;">
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>Data Fim</label>
+                <input type="date" id="dev-data-fim" style="background: #f4f4f9; border: 1px solid #ccc;">
+            </div>
+        </div>
+        
+        <button class="btn-salvar" style="background-color: #6f42c1; margin-top: 0;" onclick="executarMockMensal()">🚀 Puxar Dados para a Tabela</button>
+        <button class="btn-cancelar" style="background-color: transparent; color: #666; margin-top: 10px;" onclick="document.getElementById('modal-dev').style.display='none'">Cancelar</button>
+    </div>
+</div>
+
 <div class="container">
     <h2>🚗 Sistema de Auditoria de Frotas - ECOS</h2>
     <div class="subtitle">
@@ -80,6 +109,8 @@
             <button class="tab-btn" onclick="abrirAba(event, 'aba-veiculos')">🚛 Veículos</button>
         </div>
         <div>
+            <button style="padding: 10px 15px; background-color: #6f42c1; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-right: 10px;" onclick="abrirModalDev()" title="Modo Dev: Puxar relatórios mensais">🪄 Painel Dev</button>
+            
             <input type="file" id="upload-excel" accept=".xlsx" style="display: none;" onchange="importarExcel(event)">
             <button style="padding: 10px 20px; background-color: #ffc107; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;" onclick="document.getElementById('upload-excel').click()">📂 Importar Planilha</button>
         </div>
@@ -104,7 +135,7 @@
         <table id="bdtTable">
             <thead>
                 <tr>
-                    <th width="6%">Dia</th>
+                    <th width="12%">Data</th>
                     <th width="10%">Hora In.</th>
                     <th width="10%">KM Inicial</th>
                     <th width="17%">Origem</th>
@@ -117,7 +148,7 @@
             </thead>
             <tbody>
                 <tr>
-                    <td><input type="number" class="dia" placeholder="Dia"></td>
+                    <td><input type="date" class="data-viagem"></td>
                     <td><input type="time" class="hora-in"></td>
                     <td><input type="number" step="0.1" class="km-in" placeholder="KM In"></td>
                     <td><input type="text" class="origem" placeholder="Origem" oninput="sincronizarCacheMaps(this)"></td>
@@ -140,7 +171,7 @@
         <table id="combTable">
             <thead>
                 <tr>
-                    <th width="15%">Dia</th>
+                    <th width="15%">Data</th>
                     <th width="15%">Hora</th>
                     <th width="30%">KM Marcado na Bomba</th>
                     <th width="30%">Litros Abastecidos</th>
@@ -149,7 +180,7 @@
             </thead>
             <tbody>
                 <tr>
-                    <td><input type="number" class="dia" placeholder="Dia"></td>
+                    <td><input type="date" class="data-viagem"></td>
                     <td><input type="time" class="hora"></td>
                     <td><input type="number" step="0.1" class="km-bomba"></td>
                     <td><input type="number" step="0.1" class="litros"></td>
@@ -281,7 +312,7 @@
 
         <div id="box-confirmacao-erros" style="display: none; background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
             <p style="margin-top: 0; font-weight: bold; font-size: 15px;">⚠️ Inconsistências Detectadas!</p>
-            <p style="font-size: 14px; margin-bottom: 15px;">Isso pode indicar uma fraude/erro do motorista, ou um erro de digitação seu. Por favor, confira o documento físico.</p>
+            <p style="font-size: 14px; margin-bottom: 15px;">Isso pode indicar um erro de digitação seu. Por favor, confira se o preenchimento está correto.</p>
             <label style="display: flex; align-items: center; cursor: pointer; font-weight: bold; font-size: 14px; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
                 <input type="checkbox" id="check-verificado" style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;">
                 Confirmo que digitei exatamente o que está no papel. Quero registrar no Banco para a Diretoria avaliar.
@@ -498,7 +529,7 @@
 
 
     // ==========================================
-    // FUNÇÕES DA CALCULADORA / BDT / MAPS (Mantidas idênticas)
+    // FUNÇÕES DA CALCULADORA / BDT / MAPS
     // ==========================================
     
     const cacheDeRotasMaps = {};
@@ -588,7 +619,7 @@
         for(let i = 1; i <= numParadas; i++) { tdsParadas += `<td><input type="text" class="parada" placeholder="Parada ${i}"></td>`; }
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><input type="number" class="dia" placeholder="${sugestaoDia}" data-sugestao="${sugestaoDia}"></td>
+            <td><input type="date" class="data-viagem" value="${sugestaoDia}" data-sugestao="${sugestaoDia}"></td>
             <td><input type="time" class="hora-in" placeholder="${sugestaoHoraIn}" data-sugestao="${sugestaoHoraIn}"></td>
             <td><input type="number" step="0.1" class="km-in" placeholder="${sugestaoKmIn}" data-sugestao="${sugestaoKmIn}"></td>
             <td><input type="text" class="origem" placeholder="${sugestaoOrigem}" data-sugestao="${sugestaoOrigem}" oninput="sincronizarCacheMaps(this)"></td>
@@ -605,7 +636,7 @@
     function criarNovaLinhaComb() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><input type="number" class="dia"></td>
+            <td><input type="date" class="data-viagem"></td>
             <td><input type="time" class="hora"></td>
             <td><input type="number" step="0.1" class="km-bomba"></td>
             <td><input type="number" step="0.1" class="litros"></td>
@@ -664,7 +695,7 @@
                 let proximaTr = trAtual.nextElementSibling;
                 if (!proximaTr) {
                     if (tabelaId === 'bdtTable') {
-                        const diaAtual = trAtual.querySelector('.dia').value; const horaInAtual = trAtual.querySelector('.hora-out').value;
+                        const diaAtual = trAtual.querySelector('.data-viagem').value; const horaInAtual = trAtual.querySelector('.hora-out').value;
                         const destinoAtual = trAtual.querySelector('.destino').value; const kmFinalAtual = trAtual.querySelector('.km-out').value;
                         proximaTr = criarNovaLinhaBDT(diaAtual, horaInAtual, destinoAtual, kmFinalAtual);
                     } else if (tabelaId === 'combTable') { proximaTr = criarNovaLinhaComb(); }
@@ -673,6 +704,137 @@
             }
         }
     });
+
+    // ==========================================
+    // MODO DESENVOLVEDOR (AUTO-PREENCHIMENTO MENSAL)
+    // ==========================================
+    function abrirModalDev() {
+        document.getElementById('dev-motorista').innerHTML = document.getElementById('select-motorista').innerHTML;
+        document.getElementById('dev-veiculo').innerHTML = document.getElementById('select-veiculo').innerHTML;
+        document.getElementById('modal-dev').style.display = 'flex';
+    }
+
+    async function executarMockMensal() {
+        const idMot = document.getElementById('dev-motorista').value;
+        const idVei = document.getElementById('dev-veiculo').value;
+        const diaIn = document.getElementById('dev-data-inicio').value;
+        const diaFim = document.getElementById('dev-data-fim').value;
+
+        if (!idMot || !idVei) return alert("Selecione um motorista e um veículo para puxar o histórico.");
+
+        const payload = {
+            id_motorista: idMot,
+            id_veiculo: idVei,
+            dia_inicio: diaIn,
+            dia_fim: diaFim
+        };
+
+        try {
+            const resposta = await fetch('/api/dev/mock_periodo', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(payload) 
+            });
+            const resultado = await resposta.json();
+            
+            if (resultado.status !== "sucesso") {
+                return alert(resultado.mensagem);
+            }
+
+            // ==========================================
+            // CORREÇÃO: LIMPANDO A TELA ANTERIOR
+            // ==========================================
+            document.getElementById('box-relatorio').style.display = 'none'; // Esconde o relatório antigo
+            document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error')); // Tira as bordas vermelhas, se houver
+
+            document.getElementById('modal-dev').style.display = 'none';
+            document.getElementById('select-motorista').value = idMot;
+            document.getElementById('select-veiculo').value = idVei;
+            document.querySelector('#bdtTable tbody').innerHTML = '';
+            
+            let maxParadas = 0;
+            resultado.viagens.forEach(linha => {
+                if (linha.destino && linha.destino.includes(' ➔ ')) {
+                    const qtdParadas = linha.destino.split(' ➔ ').length - 1;
+                    if (qtdParadas > maxParadas) maxParadas = qtdParadas;
+                }
+            });
+
+            document.querySelectorAll('#bdtTable thead th.th-parada').forEach(th => th.remove());
+            const theadTr = document.querySelector('#bdtTable thead tr');
+            const thDestino = theadTr.querySelector('.th-destino');
+            for (let i = 1; i <= maxParadas; i++) {
+                const novoTh = document.createElement('th');
+                novoTh.className = 'th-parada';
+                novoTh.innerText = `Parada ${i}`;
+                theadTr.insertBefore(novoTh, thDestino);
+            }
+
+            resultado.viagens.forEach(linha => {
+                let paradasTexto = [];
+                let destinoFinal = linha.destino;
+                
+                if (linha.destino && linha.destino.includes(' ➔ ')) {
+                    const partes = linha.destino.split(' ➔ ');
+                    destinoFinal = partes.pop();
+                    paradasTexto = partes;
+                }
+
+                let tdsParadas = '';
+                for (let i = 0; i < maxParadas; i++) {
+                    const valor = paradasTexto[i] || '';
+                    tdsParadas += `<td><input type="text" class="parada" placeholder="Parada ${i+1}" value="${valor}"></td>`;
+                }
+
+                const tr = document.createElement('tr');
+                const kmMapsFormatado = linha.km_maps_opcional ? linha.km_maps_opcional : '';
+                
+                tr.innerHTML = `
+                    <td><input type="date" class="data-viagem" value="${linha.data_viagem || linha.data_iso}"></td>
+                    <td><input type="time" class="hora-in" value="${linha.hora_inicio}"></td>
+                    <td><input type="number" step="0.1" class="km-in" value="${linha.km_inicial}"></td>
+                    <td><input type="text" class="origem" value="${linha.origem}" oninput="sincronizarCacheMaps(this)"></td>
+                    ${tdsParadas}
+                    <td class="td-destino"><input type="text" class="destino" value="${destinoFinal}" oninput="sincronizarCacheMaps(this)"></td>
+                    <td><input type="time" class="hora-out" value="${linha.hora_fim}"></td>
+                    <td><input type="number" step="0.1" class="km-out" value="${linha.km_final}"></td>
+                    <td><input type="number" step="0.1" class="km-maps" value="${kmMapsFormatado}" oninput="sincronizarCacheMaps(this)"></td>
+                    <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+                `;
+                document.querySelector('#bdtTable tbody').appendChild(tr);
+            });
+
+            document.querySelectorAll('.origem').forEach(input => sincronizarCacheMaps(input));
+
+            // ==========================================
+            // PREENCHER TABELA DE ABASTECIMENTOS
+            // ==========================================
+            document.querySelector('#combTable tbody').innerHTML = '';
+            
+            if (resultado.abastecimentos && resultado.abastecimentos.length > 0) {
+                resultado.abastecimentos.forEach(linha => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><input type="date" class="data-viagem" value="${linha.data_iso}"></td>
+                        <td><input type="time" class="hora" value="${linha.hora}"></td>
+                        <td><input type="number" step="0.1" class="km-bomba" value="${linha.km_bomba}"></td>
+                        <td><input type="number" step="0.1" class="litros" value="${linha.litros}"></td>
+                        <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
+                    `;
+                    document.querySelector('#combTable tbody').appendChild(tr);
+                });
+            } else {
+                criarNovaLinhaComb(); // Se não tiver abastecimento, deixa 1 linha vazia
+            }
+            // ==========================================
+
+            abrirAba({currentTarget: document.querySelector('.tab-btn')}, 'aba-bdt');
+
+        } catch (erro) {
+            console.error(erro);
+            alert("Erro de comunicação ao carregar o Dev Mode.");
+        }
+    }
 
     async function enviarParaAuditoria() {
         const idMotorista = document.getElementById('select-motorista').value;
@@ -684,7 +846,7 @@
         document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
 
         document.querySelectorAll('#bdtTable tbody tr').forEach(linha => {
-            const obrigatorios = [ linha.querySelector('.dia'), linha.querySelector('.hora-in'), linha.querySelector('.origem'), linha.querySelector('.destino'), linha.querySelector('.hora-out'), linha.querySelector('.km-in'), linha.querySelector('.km-out') ];
+            const obrigatorios = [ linha.querySelector('.data-viagem'), linha.querySelector('.hora-in'), linha.querySelector('.origem'), linha.querySelector('.destino'), linha.querySelector('.hora-out'), linha.querySelector('.km-in'), linha.querySelector('.km-out') ];
             const vazios = obrigatorios.filter(i => i.value.trim() === ''); const preenchidos = obrigatorios.filter(i => i.value.trim() !== '');
             if (preenchidos.length > 0 && preenchidos.length < 7) { bloqueiaEnvio = true; vazios.forEach(i => i.classList.add('input-error')); } 
             else if (preenchidos.length === 7) {
@@ -692,7 +854,7 @@
                 let destinoFinal = linha.querySelector('.destino').value.trim();
                 if (paradasStr.length > 0) destinoFinal = paradasStr.join(' ➔ ') + ' ➔ ' + destinoFinal;
                 payload.bdt.push({ 
-                    dia: linha.querySelector('.dia').value, hora_in: linha.querySelector('.hora-in').value, hora_out: linha.querySelector('.hora-out').value,
+                    dia: linha.querySelector('.data-viagem').value, hora_in: linha.querySelector('.hora-in').value, hora_out: linha.querySelector('.hora-out').value,
                     origem: linha.querySelector('.origem').value, destino: destinoFinal, km_in: linha.querySelector('.km-in').value, km_out: linha.querySelector('.km-out').value,
                     km_maps: (linha.querySelector('.km-maps') ? linha.querySelector('.km-maps').value : "")
                 });
@@ -760,15 +922,13 @@
             } else { divAlertas.innerHTML = '<div style="background: #d4edda; padding: 15px; border-left: 5px solid #28a745; color: #155724; border-radius: 4px;"><strong>✅ BDT Aprovado!</strong> Nenhuma inconsistência matemática, temporal ou comportamental detectada.</div>'; }
 
             const btnDownload = document.getElementById('btn-download'); btnDownload.href = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + resultado.excel_b64;
-            // --- NOVA LÓGICA DE EXIBIÇÃO DA CHECKBOX ---
             const temErroGrave = resultado.alertas.some(a => a.codigo.startsWith('ERR') || a.codigo.startsWith('INC'));
             if (temErroGrave) {
                 document.getElementById('box-confirmacao-erros').style.display = 'block';
-                document.getElementById('check-verificado').checked = false; // Garante que começa desmarcado
+                document.getElementById('check-verificado').checked = false;
             } else {
                 document.getElementById('box-confirmacao-erros').style.display = 'none';
             }
-            // -------------------------------------------
             btnDownload.download = "Auditoria_ECOS_Resultado.xlsx"; document.getElementById('box-relatorio').scrollIntoView({ behavior: 'smooth' });
         } catch (erro) { console.error("Erro na comunicação:", erro); }
     }
@@ -791,7 +951,7 @@
                         let tdsParadas = ''; for (let i = 0; i < maxParadas; i++) { const valor = paradasTexto[i] || ''; tdsParadas += `<td><input type="text" class="parada" placeholder="Parada ${i+1}" value="${valor}"></td>`; }
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
-                            <td><input type="number" class="dia" value="${linha.dia}"></td> <td><input type="time" class="hora-in" value="${linha.hora_in}"></td> <td><input type="number" step="0.1" class="km-in" value="${linha.km_in}"></td>
+                            <td><input type="date" class="data-viagem" value="${linha.dia}"></td> <td><input type="time" class="hora-in" value="${linha.hora_in}"></td> <td><input type="number" step="0.1" class="km-in" value="${linha.km_in}"></td>
                             <td><input type="text" class="origem" value="${linha.origem}" oninput="sincronizarCacheMaps(this)"></td> ${tdsParadas} <td class="td-destino"><input type="text" class="destino" value="${destinoFinal}" oninput="sincronizarCacheMaps(this)"></td>
                             <td><input type="time" class="hora-out" value="${linha.hora_out}"></td> <td><input type="number" step="0.1" class="km-out" value="${linha.km_out}"></td> <td><input type="number" step="0.1" class="km-maps" value="${linha['KM Maps'] || linha.km_maps || ''}" placeholder="Ex: 25.5" oninput="sincronizarCacheMaps(this)"></td> <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>
                         `;
@@ -800,7 +960,7 @@
                 } else { criarNovaLinhaBDT(); }
                 if(resultado.combustivel && resultado.combustivel.length > 0) {
                     resultado.combustivel.forEach(linha => {
-                        const tr = document.createElement('tr'); tr.innerHTML = `<td><input type="number" class="dia" value="${linha.dia}"></td> <td><input type="time" class="hora" value="${linha.hora || ''}"></td> <td><input type="number" step="0.1" class="km-bomba" value="${linha.km_bomba}"></td> <td><input type="number" step="0.1" class="litros" value="${linha.litros}"></td> <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>`;
+                        const tr = document.createElement('tr'); tr.innerHTML = `<td><input type="date" class="data-viagem" value="${linha.dia}"></td> <td><input type="time" class="hora" value="${linha.hora || ''}"></td> <td><input type="number" step="0.1" class="km-bomba" value="${linha.km_bomba}"></td> <td><input type="number" step="0.1" class="litros" value="${linha.litros}"></td> <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>`;
                         document.querySelector('#combTable tbody').appendChild(tr);
                     });
                 } else { criarNovaLinhaComb(); }
@@ -819,7 +979,7 @@
                 const tbody = document.querySelector('#combTable tbody'); tbody.innerHTML = '';
                 if(resultado.combustivel.length > 0) {
                     resultado.combustivel.forEach(linha => {
-                        const tr = document.createElement('tr'); tr.innerHTML = `<td><input type="number" class="dia" value="${linha.dia}"></td> <td><input type="time" class="hora" value="${linha.hora}"></td> <td><input type="number" step="0.1" class="km-bomba" value="${linha.km_bomba}"></td> <td><input type="number" step="0.1" class="litros" value="${linha.litros}"></td> <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>`;
+                        const tr = document.createElement('tr'); tr.innerHTML = `<td><input type="date" class="data-viagem" value="${linha.dia}"></td> <td><input type="time" class="hora" value="${linha.hora}"></td> <td><input type="number" step="0.1" class="km-bomba" value="${linha.km_bomba}"></td> <td><input type="number" step="0.1" class="litros" value="${linha.litros}"></td> <td><button class="btn-excluir" onclick="deletarLinha(this)" title="Excluir linha">🗑️</button></td>`;
                         tbody.appendChild(tr);
                     });
                     alert(`✅ Sucesso! ${resultado.combustivel.length} registros extraídos do PDF.`);
@@ -842,10 +1002,10 @@
             const a = document.createElement('a'); a.href = url; a.download = `Relatorio_Auditoria_ECOS.pdf`; document.body.appendChild(a); a.click(); a.remove();
         } catch (e) { alert("Erro ao gerar PDF"); } finally { btn.innerText = "📄 Gerar Relatório PDF Profissional"; }
     }
+    
     async function salvarBDTAoBanco() {
         if (!ultimoPayloadEnviado || !ultimoResultadoAuditoria) return;
         
-        // 1. Verifica se tem erro grave e se a checkbox foi marcada
         const temErroGrave = ultimoResultadoAuditoria.alertas.some(a => a.codigo.startsWith('ERR') || a.codigo.startsWith('INC'));
         if (temErroGrave) {
             const checkbox = document.getElementById('check-verificado');
@@ -854,10 +1014,14 @@
             }
         }
 
+        // ==========================================
+        // CORREÇÃO: ADICIONADO O CAMPO COMBUSTIVEL
+        // ==========================================
         const payloadBanco = {
             id_motorista: ultimoPayloadEnviado.id_motorista,
             id_veiculo: ultimoPayloadEnviado.id_veiculo,
             bdt: ultimoPayloadEnviado.bdt,
+            combustivel: ultimoPayloadEnviado.combustivel, // <-- FALTAVA ESSA LINHA AQUI!
             alertas: ultimoResultadoAuditoria.alertas
         };
 
@@ -876,7 +1040,6 @@
             if (resposta.ok) {
                 alert("✅ " + resultado.mensagem);
                 
-                // Limpa a mesa
                 document.querySelector('#bdtTable tbody').innerHTML = '';
                 document.querySelector('#combTable tbody').innerHTML = '';
                 criarNovaLinhaBDT();

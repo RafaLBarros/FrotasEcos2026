@@ -1,3 +1,4 @@
+# arquivo: services/auditoria.py
 import pandas as pd
 import io
 import base64
@@ -93,9 +94,15 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
     jornada_diaria = {} 
 
     for i, linha in enumerate(dados_bdt):
-        dia = int(linha['dia'])
-        origem, destino = linha['origem'].upper(), linha['destino'].upper()
-        km_in, km_out = float(linha['km_in']), float(linha['km_out'])
+        data_viagem = str(linha.get('dia', '')) # 'YYYY-MM-DD'
+        origem, destino = linha.get('origem', '').upper(), linha.get('destino', '').upper()
+        
+        try:
+            km_in = float(linha['km_in'])
+            km_out = float(linha['km_out'])
+        except (ValueError, TypeError):
+            continue # Se não tem km preenchido, ignora a linha na auditoria matemática
+            
         distancia = km_out - km_in
         km_total_declarado += distancia
 
@@ -105,36 +112,38 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
             try:
                 km_maps = float(km_maps_str)
                 if km_maps > 0:
-                    # Calcula 30% da viagem
                     tolerancia_calculada = km_maps * CONFIGURACOES["margem_tolerancia_maps_percentual"]
-                    
-                    # Pega o que for maior: os 30% ou o piso mínimo (ex: 2.5km)
                     tolerancia_final = max(tolerancia_calculada, CONFIGURACOES["margem_tolerancia_maps_minima_km"])
                     limite_maps = km_maps + tolerancia_final
                     
                     if distancia > limite_maps:
                         excesso = distancia - km_maps
-                        alertas.append(criar_alerta("INC-MAP01", f"No DIA {dia}, trajeto de {origem} a {destino} registrou {distancia:.1f}km. O Maps prevê ~{km_maps:.1f}km (Rodou {excesso:.1f}km a mais que o previsto)."))
+                        alertas.append(criar_alerta("INC-MAP01", f"No DIA {data_viagem}, trajeto de {origem} a {destino} registrou {distancia:.1f}km. O Maps prevê ~{km_maps:.1f}km (Rodou {excesso:.1f}km a mais que o previsto)."))
             except ValueError:
                 pass
         # ---------------------------------------
 
         try:
+            # Pegando as horas
             h_in = datetime.strptime(linha['hora_in'], "%H:%M").time()
             h_out = datetime.strptime(linha['hora_out'], "%H:%M").time()
             
-            data_in = datetime(2026, 1, dia, h_in.hour, h_in.minute)
-            data_out = datetime(2026, 1, dia, h_out.hour, h_out.minute)
+            # Fatiando a string de data (YYYY-MM-DD)
+            ano, mes, dia_int = map(int, data_viagem.split('-'))
+            
+            # Construindo o datetime perfeito com a data real!
+            data_in = datetime(ano, mes, dia_int, h_in.hour, h_in.minute)
+            data_out = datetime(ano, mes, dia_int, h_out.hour, h_out.minute)
             
             if data_out < data_in:
                 data_out += timedelta(days=1)
                 
             valido_tempo = True
-        except:
+        except Exception:
             valido_tempo = False
 
         if distancia < -CONFIGURACOES["margem_km_erro_digitação"]:
-            alertas.append(criar_alerta("ERR-KM01", f"No DIA {dia}, KM de {origem} a {destino} está negativo ({km_in} para {km_out})."))
+            alertas.append(criar_alerta("ERR-KM01", f"No DIA {data_viagem}, KM de {origem} a {destino} está negativo ({km_in} para {km_out})."))
 
         if valido_tempo:
             if distancia > 0:
@@ -146,42 +155,45 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                     velocidade_media = distancia / horas_viagem
                     if velocidade_media > CONFIGURACOES["velocidade_maxima_permitida_kmh"]:
                         minutos_viagem = horas_viagem * 60
-                        alertas.append(criar_alerta("INC-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em {minutos_viagem:.0f} minutos. Média: {velocidade_media:.1f} km/h!"))
+                        alertas.append(criar_alerta("INC-VEL01", f"No DIA {data_viagem}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em {minutos_viagem:.0f} minutos. Média: {velocidade_media:.1f} km/h!"))
                 elif horas_viagem == 0:
-                    alertas.append(criar_alerta("INC-VEL01", f"No DIA {dia}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em 0 minutos. Velocidade impossível!"))
+                    alertas.append(criar_alerta("INC-VEL01", f"No DIA {data_viagem}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em 0 minutos. Velocidade impossível!"))
 
-            if dia not in jornada_diaria:
-                jornada_diaria[dia] = {"primeiro_in": data_in, "ultimo_out": data_out}
+            if data_viagem not in jornada_diaria:
+                jornada_diaria[data_viagem] = {"primeiro_in": data_in, "ultimo_out": data_out}
             else:
-                jornada_diaria[dia]["ultimo_out"] = data_out
+                jornada_diaria[data_viagem]["ultimo_out"] = data_out
 
             inicio_comercial = datetime(data_in.year, data_in.month, data_in.day, 8, 0)
             fim_comercial = datetime(data_out.year, data_out.month, data_out.day, 18, 0)
             
             if data_in < inicio_comercial - timedelta(minutes=CONFIGURACOES["margem_minutos_jornada"]):
-                alertas.append(criar_alerta("ALT-JRN01", f"Viagem DIA {dia} iniciou às {h_in.strftime('%H:%M')}."))
+                alertas.append(criar_alerta("ALT-JRN01", f"Viagem DIA {data_viagem} iniciou às {h_in.strftime('%H:%M')}."))
             if data_out > fim_comercial + timedelta(minutes=CONFIGURACOES["margem_minutos_jornada"]):
-                alertas.append(criar_alerta("ALT-JRN01", f"Viagem DIA {dia} encerrou às {h_out.strftime('%H:%M')}."))
+                alertas.append(criar_alerta("ALT-JRN01", f"Viagem DIA {data_viagem} encerrou às {h_out.strftime('%H:%M')}."))
 
         if viagem_anterior is not None:
             salto = km_in - viagem_anterior['km_out']
             
             if salto > CONFIGURACOES["margem_km_salto_aceitavel"]:
                 km_total_nao_registrado += salto
-                alertas.append(criar_alerta("ALT-SLT01", f"Salto de {salto:.1f}km entre a viagem passada e o início da viagem do DIA {dia}."))
+                alertas.append(criar_alerta("ALT-SLT01", f"Salto de {salto:.1f}km entre a viagem passada e o início da viagem do DIA {data_viagem}."))
                 
                 for comb in dados_combustivel:
-                    km_bomba = float(comb['km_bomba'])
-                    if viagem_anterior['km_out'] < km_bomba < km_in:
-                        alertas.append(criar_alerta("INC-ABS01", f"Abastecimento de {comb['litros']}L no DIA {comb['dia']} (KM {km_bomba}) no meio do salto não registrado de {salto:.1f}km!"))
+                    try:
+                        km_bomba = float(comb['km_bomba'])
+                        if viagem_anterior['km_out'] < km_bomba < km_in:
+                            alertas.append(criar_alerta("INC-ABS01", f"Abastecimento de {comb['litros']}L no DIA {comb['dia']} (KM {km_bomba}) no meio do salto não registrado de {salto:.1f}km!"))
+                    except:
+                        pass
 
         if valido_tempo:
             for comb in dados_combustivel:
-                if comb['hora'] and comb['dia'] == str(dia):
-                    km_bomba = float(comb['km_bomba'])
-                    
-                    if km_in <= km_bomba <= km_out:
-                        try:
+                if comb.get('hora') and comb.get('dia') == data_viagem:
+                    try:
+                        km_bomba = float(comb['km_bomba'])
+                        
+                        if km_in <= km_bomba <= km_out:
                             h_comb_obj = datetime.strptime(comb['hora'], "%H:%M").time()
                             data_comb = datetime(data_in.year, data_in.month, data_in.day, h_comb_obj.hour, h_comb_obj.minute)
                             
@@ -192,12 +204,12 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                             janela_out = data_out + timedelta(minutes=CONFIGURACOES["margem_minutos_posto"])
                             
                             if not (janela_in <= data_comb <= janela_out):
-                                alertas.append(criar_alerta("INC-ABS02", f"No DIA {dia}, trajeto condiz com abastecimento, mas viagem ocorreu {h_in.strftime('%H:%M')}-{h_out.strftime('%H:%M')} e o posto registrou {comb['hora']}."))
-                        except:
-                            pass
+                                alertas.append(criar_alerta("INC-ABS02", f"No DIA {data_viagem}, trajeto condiz com abastecimento, mas viagem ocorreu {h_in.strftime('%H:%M')}-{h_out.strftime('%H:%M')} e o posto registrou {comb['hora']}."))
+                    except Exception:
+                        pass
 
         viagem_anterior = {'km_out': km_out, 'valido_tempo': valido_tempo, 'data_out': data_out if valido_tempo else None}
-        logs_bdt.append({"Dia": dia, "Hora In": linha['hora_in'], "Hora Fim": linha['hora_out'], "Origem": origem, "Destino": destino, "KM Inicial": km_in, "KM Final": km_out, "Distância (km)": distancia, "KM Maps": km_maps_str})
+        logs_bdt.append({"Data": data_viagem, "Hora In": linha.get('hora_in', ''), "Hora Fim": linha.get('hora_out', ''), "Origem": origem, "Destino": destino, "KM Inicial": km_in, "KM Final": km_out, "Distância (km)": distancia, "KM Maps": km_maps_str})
 
     limite_horas = CONFIGURACOES["horas_trabalho_dia"] + CONFIGURACOES["horas_extra_limite"]
     for dia_jornada, dados_jornada in jornada_diaria.items():

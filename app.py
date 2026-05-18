@@ -5,12 +5,15 @@ from services.auditoria import rodar_auditoria_completa
 import fitz
 import re
 import io
+from datetime import datetime  # <-- NOVO: Necessário para manipular as datas
 from database import (
     listar_motoristas_ativos, listar_veiculos_ativos, 
     salvar_motorista, salvar_veiculo,
     editar_motorista, excluir_motorista,
     editar_veiculo, excluir_veiculo,
-    salvar_jornada
+    salvar_jornada,
+    buscar_ultima_jornada_dev,
+    buscar_dados_completos_periodo
 )
 
 
@@ -107,7 +110,6 @@ def api_auditar():
     resultado = rodar_auditoria_completa(dados_bdt, dados_combustivel)
     return jsonify(resultado)
 
-# NOVIDADE: Rota para importar o Excel
 @app.route('/api/importar', methods=['POST'])
 def api_importar():
     if 'file' not in request.files:
@@ -115,7 +117,6 @@ def api_importar():
     
     file = request.files['file']
     try:
-        # ATUALIZAÇÃO: Usar BytesIO e ExcelFile para ler várias abas de forma segura
         file_bytes = file.read()
         xls = pd.ExcelFile(io.BytesIO(file_bytes))
         
@@ -123,30 +124,43 @@ def api_importar():
         df_bdt = df_bdt.dropna(subset=['Dia'])
         
         df_comb = pd.DataFrame()
-        # Valida se a aba existe para evitar erros
         if 'Abastecimentos' in xls.sheet_names:
             df_comb = pd.read_excel(xls, sheet_name='Abastecimentos')
-            # Busca pela coluna "dia" independente de estar maiúscula ou minúscula
             col_dia = 'Dia' if 'Dia' in df_comb.columns else 'dia'
             if col_dia in df_comb.columns:
                 df_comb = df_comb.dropna(subset=[col_dia])
 
-        # Formatação para não aparecer "nan" na tela do HTML
+        # Formatação padrão para strings comuns
         def safe_str(val):
             if pd.isna(val): return ""
             if isinstance(val, float) and val.is_integer(): return str(int(val))
             return str(val).strip()
 
+        # NOVO: Função para garantir que a data do Excel vire YYYY-MM-DD
+        def safe_date(val):
+            if pd.isna(val): return ""
+            # Se já for uma data do Pandas/Excel
+            if isinstance(val, pd.Timestamp) or hasattr(val, 'strftime'):
+                return val.strftime('%Y-%m-%d')
+            try:
+                # Se for planilha antiga só com o número do dia (ex: 14), põe no mês atual
+                dia_num = int(float(val))
+                hoje = datetime.today()
+                return f"{hoje.year}-{hoje.month:02d}-{dia_num:02d}"
+            except:
+                return str(val).strip()
+
         bdt_list = []
         for _, row in df_bdt.iterrows():
             bdt_list.append({
-                "dia": str(int(row["Dia"])),
+                "dia": safe_date(row.get("Dia")), # Atualizado para usar data
                 "hora_in": safe_str(row.get("Hora In", "")),
                 "hora_out": safe_str(row.get("Hora Fim", "")),
                 "origem": safe_str(row["Origem"]),
                 "destino": safe_str(row["Destino"]),
                 "km_in": safe_str(row["KM Inicial"]),
-                "km_out": safe_str(row["KM Final"])
+                "km_out": safe_str(row["KM Final"]),
+                "km_maps": safe_str(row.get("KM Maps", ""))
             })
         
         comb_list = []
@@ -158,7 +172,7 @@ def api_importar():
                 col_litros = row.get("Litros Abastecidos") or row.get("litros")
 
                 comb_list.append({
-                    "dia": str(int(col_dia)) if pd.notna(col_dia) else "",
+                    "dia": safe_date(col_dia), # Atualizado para usar data
                     "hora": safe_str(col_hora),
                     "km_bomba": safe_str(col_km),
                     "litros": safe_str(col_litros)
@@ -182,42 +196,38 @@ def api_importar_pdf_combustivel():
         for page in doc:
             texto_completo += page.get_text("text")
 
-        # 1. Âncora de Data e Hora: Busca o Código de Transação (10 dígitos), seguido de data, seguido de hora.
-        # Padrão capturado: "1053719408 04/02/2026 14:51:08" -> Extrai ('04', '14:51')
-        matches_data_hora = re.findall(r'\b\d{10}\s+(\d{2})/\d{2}/\d{4}\s+(\d{2}:\d{2}):\d{2}\b', texto_completo)
+        # NOVO REGEX: Agora captura a data inteira (DD/MM/YYYY) em vez de só os dois primeiros dígitos
+        matches_data_hora = re.findall(r'\b\d{10}\s+(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2}):\d{2}\b', texto_completo)
         
-        # 2. Âncora de KM e Litros: Busca a sequência exata de KM, Litros e Valor
-        # Padrão capturado: "85013 25.85 160,00" -> Extrai ('85013', '25.85')
         dados_bomba = re.findall(r'\b(\d{5,7})\s+(\d+[\., :]\d{2})\s+\d+[\., :]\d{2}\b', texto_completo)
 
         comb_list = []
         
-        # Se encontrou os pares na mesma quantidade, junta tudo!
         if len(matches_data_hora) > 0 and len(matches_data_hora) == len(dados_bomba):
-            for (dia_str, hora_str), (km, litros_raw) in zip(matches_data_hora, dados_bomba):
+            for (data_str, hora_str), (km, litros_raw) in zip(matches_data_hora, dados_bomba):
                 
-                dia_limpo = str(int(dia_str))
+                # Inverte de DD/MM/YYYY para YYYY-MM-DD
+                dia, mes, ano = data_str.split('/')
+                data_iso = f"{ano}-{mes}-{dia}"
+                
                 litros_limpo = litros_raw.replace(',', '.').replace(' ', '.').replace(':', '.')
                 
                 comb_list.append({
-                    "dia": dia_limpo,
+                    "dia": data_iso,  # <-- Agora envia a data certinha pro HTML
                     "hora": hora_str,
                     "km_bomba": km,
                     "litros": litros_limpo
                 })
             
-            # --- NOVIDADE: DEBUG NO TERMINAL ---
             print("\n" + "="*40)
             print("🚀 DEBUG: LEITURA DO PDF COMBUSTÍVEL")
             print("="*40)
             for i, item in enumerate(comb_list):
-                print(f"Item {i+1}: Dia {item['dia']} | Hora: {item['hora']} | KM: {item['km_bomba']} | Litros: {item['litros']}")
+                print(f"Item {i+1}: Data {item['dia']} | Hora: {item['hora']} | KM: {item['km_bomba']} | Litros: {item['litros']}")
             print("="*40 + "\n")
-            # -----------------------------------
 
             return jsonify({"status": "sucesso", "combustivel": comb_list})
         else:
-            # DEBUG DE ERRO NO TERMINAL
             print(f"\n❌ ERRO DE DEBUG: Achou {len(matches_data_hora)} datas/horas e {len(dados_bomba)} abastecimentos.")
             erro_msg = f"Falha de pareamento: Encontrou {len(matches_data_hora)} registros de tempo e {len(dados_bomba)} de bomba."
             return jsonify({"status": "erro", "mensagem": erro_msg}), 400
@@ -229,7 +239,6 @@ def api_importar_pdf_combustivel():
 def api_gerar_pdf():
     dados = request.json
     
-    # 1. MONTANDO O HTML (O design será o mesmo para ambas as ferramentas)
     html_template = f"""
     <html>
     <head>
@@ -298,7 +307,6 @@ def api_gerar_pdf():
 
         ocorrencias_html = "".join([f"<li class='alert-item'>{oc}</li>" for oc in alerta['ocorrencias']])
         
-        # O xhtml2pdf se dá melhor com <p> do que com <div> dentro de tabelas
         html_template += f"""
         <table class="alert-group" style="width: 100%; margin-bottom: 15px; border-collapse: collapse;">
             <tr>
@@ -327,26 +335,20 @@ def api_gerar_pdf():
 
     pdf_io = io.BytesIO()
 
-    # 2. A MÁGICA DO FALLBACK (Tenta WeasyPrint primeiro, cai para xhtml2pdf se falhar)
     try:
-        # Importação feita DENTRO do try, pois é aqui que o Windows costuma gritar o erro
         from weasyprint import HTML
-        
         print("🟢 TENTANDO GERAR PDF COM: WeasyPrint (Alta Qualidade)")
         HTML(string=html_template).write_pdf(pdf_io)
         gerador_usado = "WeasyPrint"
 
     except Exception as e:
-        # Se cair aqui, é porque a DLL do Windows falhou ou o WeasyPrint não tá instalado direito
         print("🟡 WEASYPRINT FALHOU. Iniciando Fallback de Segurança para xhtml2pdf.")
         print(f"Erro original: {e}")
         
         try:
             from xhtml2pdf import pisa
-            
             print("🟢 GERANDO PDF COM: xhtml2pdf (Modo Compatibilidade)")
             
-            # Limpa o buffer para garantir que não tem lixo da tentativa falha
             pdf_io = io.BytesIO() 
             pisa_status = pisa.CreatePDF(io.StringIO(html_template), dest=pdf_io)
             
@@ -356,11 +358,9 @@ def api_gerar_pdf():
             gerador_usado = "xhtml2pdf"
 
         except ImportError:
-            # Se a pessoa também não instalou o xhtml2pdf, aí ferrou.
             return jsonify({"status": "erro", "mensagem": "Bibliotecas de PDF não estão instaladas. Rode 'pip install xhtml2pdf'."}), 500
 
     pdf_io.seek(0)
-    
     print(f"✅ PDF gerado com sucesso usando: {gerador_usado}")
 
     return send_file(pdf_io, mimetype='application/pdf', as_attachment=True, download_name="Auditoria_ECOS.pdf")
@@ -371,16 +371,47 @@ def api_salvar_viagens():
     id_motorista = dados.get('id_motorista')
     id_veiculo = dados.get('id_veiculo')
     viagens = dados.get('bdt', [])
+    abastecimentos = dados.get('combustivel', [])
     alertas = dados.get('alertas', []) 
     
     if not viagens:
         return jsonify({"status": "erro", "mensagem": "Nenhuma viagem encontrada para salvar."}), 400
         
-    sucesso, mensagem = salvar_jornada(id_motorista, id_veiculo, viagens, alertas)
+    sucesso, mensagem = salvar_jornada(id_motorista, id_veiculo, viagens, abastecimentos, alertas)
     
     if sucesso:
         return jsonify({"status": "sucesso", "mensagem": mensagem}), 200
     return jsonify({"status": "erro", "mensagem": mensagem}), 400
+
+# --- ROTA DE DESENVOLVEDOR (MOCK) ---
+@app.route('/api/dev/mock', methods=['GET'])
+def api_dev_mock():
+    id_mot, id_vei, viagens = buscar_ultima_jornada_dev()
+    if not viagens:
+        return jsonify({"status": "erro", "mensagem": "Nenhuma viagem salva no banco ainda. Faça pelo menos um salvamento manual primeiro."}), 400
+        
+    return jsonify({
+        "status": "sucesso", 
+        "id_motorista": id_mot, 
+        "id_veiculo": id_vei, 
+        "viagens": viagens
+    }), 200
+
+@app.route('/api/dev/mock_periodo', methods=['POST'])
+def api_dev_mock_periodo():
+    dados = request.get_json()
+    id_mot = dados.get('id_motorista')
+    id_vei = dados.get('id_veiculo')
+    dia_inicio = dados.get('dia_inicio')
+    dia_fim = dados.get('dia_fim')
+    
+    viagens, abastecimentos = buscar_dados_completos_periodo(id_mot, id_vei, dia_inicio, dia_fim)
+    
+    if not viagens and not abastecimentos:
+        # Mensagem atualizada para ficar bem clara
+        return jsonify({"status": "erro", "mensagem": "Nenhum dado encontrado para este motorista neste veículo durante o período selecionado."}), 400
+        
+    return jsonify({"status": "sucesso", "viagens": viagens, "abastecimentos": abastecimentos}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
