@@ -15,7 +15,9 @@ from database import (
     buscar_ultima_jornada_dev,
     buscar_dados_completos_periodo
 )
-
+from services.drive_sync import baixar_banco_mais_recente
+from dotenv import load_dotenv
+load_dotenv()  # <-- Carrega as configurações do arquivo .env local
 
 app = Flask(__name__)
 
@@ -412,6 +414,10 @@ def api_dev_mock_periodo():
         return jsonify({"status": "erro", "mensagem": "Nenhum dado encontrado para este motorista neste veículo durante o período selecionado."}), 400
         
     return jsonify({"status": "sucesso", "viagens": viagens, "abastecimentos": abastecimentos}), 200
+
+# Força o download do último estado do banco ANTES do Flask subir as rotas
+print("🚀 Inicializando persistência de dados via Google Drive...")
+baixar_banco_mais_recente()
 
 if __name__ == '__main__':
     app.run(debug=True)

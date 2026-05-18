@@ -1,6 +1,7 @@
 # arquivo: database.py
 import sqlite3
 import json
+from services.drive_sync import enviar_banco_para_o_drive
 
 def obter_conexao():
     conexao = sqlite3.connect('ecos_database.db', check_same_thread=False)
@@ -46,6 +47,7 @@ def salvar_motorista(nome, matricula):
     try:
         cursor.execute("INSERT INTO dim_motorista (nome, matricula) VALUES (?, ?)", (nome, matricula))
         conexao.commit()
+        enviar_banco_para_o_drive() # Sincroniza na nuvem instantaneamente
         return True, "Motorista cadastrado com sucesso!"
     except sqlite3.IntegrityError:
         return False, "Erro: Essa matrícula já está cadastrada no sistema."
@@ -64,6 +66,7 @@ def salvar_veiculo(placa, modelo, ano, combustivel, especie, proprietario):
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (placa, modelo, ano, combustivel, especie, proprietario))
         conexao.commit()
+        enviar_banco_para_o_drive() # Sincroniza na nuvem instantaneamente
         return True, "Veículo cadastrado com sucesso!"
     except sqlite3.IntegrityError:
         return False, "Erro: Essa placa já está cadastrada no sistema."
@@ -82,6 +85,7 @@ def editar_motorista(id_motorista, nome, matricula):
     try:
         cursor.execute("UPDATE dim_motorista SET nome = ?, matricula = ? WHERE id = ?", (nome, matricula, id_motorista))
         conexao.commit()
+        enviar_banco_para_o_drive() # Sincroniza na nuvem instantaneamente
         return True, "Motorista atualizado com sucesso!"
     except Exception as e:
         return False, f"Erro ao editar: {str(e)}"
@@ -94,6 +98,7 @@ def excluir_motorista(id_motorista):
     try:
         cursor.execute("DELETE FROM dim_motorista WHERE id = ?", (id_motorista,))
         conexao.commit()
+        enviar_banco_para_o_drive() # Sincroniza na nuvem instantaneamente
         return True, "Motorista excluído com sucesso!"
     except sqlite3.IntegrityError:
         return False, "Este motorista possui viagens no sistema e não pode ser excluído (apenas inativado no futuro)."
@@ -110,6 +115,7 @@ def editar_veiculo(id_veiculo, placa, modelo, ano, combustivel, especie, proprie
             WHERE id = ?
         ''', (placa, modelo, ano, combustivel, especie, proprietario, id_veiculo))
         conexao.commit()
+        enviar_banco_para_o_drive() # Sincroniza na nuvem instantaneamente
         return True, "Veículo atualizado com sucesso!"
     except Exception as e:
         return False, f"Erro ao editar: {str(e)}"
@@ -122,6 +128,7 @@ def excluir_veiculo(id_veiculo):
     try:
         cursor.execute("DELETE FROM dim_veiculo WHERE id = ?", (id_veiculo,))
         conexao.commit()
+        enviar_banco_para_o_drive() # Sincroniza na nuvem instantaneamente
         return True, "Veículo excluído com sucesso!"
     except sqlite3.IntegrityError:
         return False, "Este veículo possui viagens no sistema e não pode ser excluído."
@@ -203,6 +210,7 @@ def salvar_jornada(id_motorista, id_veiculo, viagens, abastecimentos, alertas):
 
         # Se passou por todos os loops sem disparar nenhum erro, confirma o salvamento geral!
         conexao.commit()
+        enviar_banco_para_o_drive() # Sincroniza na nuvem instantaneamente
         return True, "Jornada e Abastecimentos salvos com sucesso!"
     
     except Exception as e:
@@ -305,6 +313,7 @@ def migrar_datas_antigas_para_fevereiro():
             cursor.execute("UPDATE fato_viagem SET data_viagem = ? WHERE id = ?", (nova_data, v['id']))
         
         conexao.commit()
+        enviar_banco_para_o_drive() # Sincroniza na nuvem instantaneamente
         print(f"✅ Sucesso! {len(viagens)} viagens foram atualizadas para o formato de Fevereiro de 2026.")
     except Exception as e:
         conexao.rollback()
