@@ -80,7 +80,28 @@ def criar_alerta(codigo, resumo):
 # =========================================================================
 # 3. MOTOR DA AUDITORIA
 # =========================================================================
-def rodar_auditoria_completa(dados_bdt, dados_combustivel):
+def rodar_auditoria_completa(dados_bdt, dados_combustivel, configs_dinamicas=None):
+    # 1. CARREGANDO E MESCLANDO CONFIGURAÇÕES DA TELA
+    # Criamos uma cópia local para não alterar o padrão global acidentalmente
+    CONFIG_ATUAL = {
+        "margem_km_erro_digitação": 1.0,
+        "margem_km_salto_aceitavel": 5.0,
+        "margem_minutos_jornada": 120,
+        "horas_trabalho_dia": 8.0,
+        "horas_extra_limite": 2.0,
+        "margem_minutos_posto": 15,
+        "consumo_esperado_km_l": 10.0,
+        "margem_tolerancia_consumo": 2.5,
+        "velocidade_maxima_permitida_kmh": 200.0,
+        "margem_tolerancia_maps_percentual": 0.30,
+        "margem_tolerancia_maps_minima_km": 2.5 
+    }
+    
+    if configs_dinamicas:
+        CONFIG_ATUAL["consumo_esperado_km_l"] = float(configs_dinamicas.get("consumo_esperado", 10.0))
+        CONFIG_ATUAL["margem_km_salto_aceitavel"] = float(configs_dinamicas.get("margem_salto", 5.0))
+        CONFIG_ATUAL["margem_tolerancia_maps_percentual"] = float(configs_dinamicas.get("tolerancia_maps", 30)) / 100.0
+
     alertas = []
     logs_bdt = []
     km_total_declarado = 0
@@ -112,8 +133,8 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
             try:
                 km_maps = float(km_maps_str)
                 if km_maps > 0:
-                    tolerancia_calculada = km_maps * CONFIGURACOES["margem_tolerancia_maps_percentual"]
-                    tolerancia_final = max(tolerancia_calculada, CONFIGURACOES["margem_tolerancia_maps_minima_km"])
+                    tolerancia_calculada = km_maps * CONFIG_ATUAL["margem_tolerancia_maps_percentual"]
+                    tolerancia_final = max(tolerancia_calculada, CONFIG_ATUAL["margem_tolerancia_maps_minima_km"])
                     limite_maps = km_maps + tolerancia_final
                     
                     if distancia > limite_maps:
@@ -142,7 +163,7 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
         except Exception:
             valido_tempo = False
 
-        if distancia < -CONFIGURACOES["margem_km_erro_digitação"]:
+        if distancia < -CONFIG_ATUAL["margem_km_erro_digitação"]:
             alertas.append(criar_alerta("ERR-KM01", f"No DIA {data_viagem}, KM de {origem} a {destino} está negativo ({km_in} para {km_out})."))
 
         if valido_tempo:
@@ -153,7 +174,7 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                     tempo_util_velocidade += horas_viagem
                     
                     velocidade_media = distancia / horas_viagem
-                    if velocidade_media > CONFIGURACOES["velocidade_maxima_permitida_kmh"]:
+                    if velocidade_media > CONFIG_ATUAL["velocidade_maxima_permitida_kmh"]:
                         minutos_viagem = horas_viagem * 60
                         alertas.append(criar_alerta("INC-VEL01", f"No DIA {data_viagem}, trajeto de {origem} a {destino} cobriu {distancia:.1f}km em {minutos_viagem:.0f} minutos. Média: {velocidade_media:.1f} km/h!"))
                 elif horas_viagem == 0:
@@ -167,15 +188,15 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
             inicio_comercial = datetime(data_in.year, data_in.month, data_in.day, 8, 0)
             fim_comercial = datetime(data_out.year, data_out.month, data_out.day, 18, 0)
             
-            if data_in < inicio_comercial - timedelta(minutes=CONFIGURACOES["margem_minutos_jornada"]):
+            if data_in < inicio_comercial - timedelta(minutes=CONFIG_ATUAL["margem_minutos_jornada"]):
                 alertas.append(criar_alerta("ALT-JRN01", f"Viagem DIA {data_viagem} iniciou às {h_in.strftime('%H:%M')}."))
-            if data_out > fim_comercial + timedelta(minutes=CONFIGURACOES["margem_minutos_jornada"]):
+            if data_out > fim_comercial + timedelta(minutes=CONFIG_ATUAL["margem_minutos_jornada"]):
                 alertas.append(criar_alerta("ALT-JRN01", f"Viagem DIA {data_viagem} encerrou às {h_out.strftime('%H:%M')}."))
 
         if viagem_anterior is not None:
             salto = km_in - viagem_anterior['km_out']
             
-            if salto > CONFIGURACOES["margem_km_salto_aceitavel"]:
+            if salto > CONFIG_ATUAL["margem_km_salto_aceitavel"]:
                 km_total_nao_registrado += salto
                 alertas.append(criar_alerta("ALT-SLT01", f"Salto de {salto:.1f}km entre a viagem passada e o início da viagem do DIA {data_viagem}."))
                 
@@ -200,8 +221,8 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
                             if data_comb < data_in and (data_out - data_in).days > 0:
                                 data_comb += timedelta(days=1)
                             
-                            janela_in = data_in - timedelta(minutes=CONFIGURACOES["margem_minutos_posto"])
-                            janela_out = data_out + timedelta(minutes=CONFIGURACOES["margem_minutos_posto"])
+                            janela_in = data_in - timedelta(minutes=CONFIG_ATUAL["margem_minutos_posto"])
+                            janela_out = data_out + timedelta(minutes=CONFIG_ATUAL["margem_minutos_posto"])
                             
                             if not (janela_in <= data_comb <= janela_out):
                                 alertas.append(criar_alerta("INC-ABS02", f"No DIA {data_viagem}, trajeto condiz com abastecimento, mas viagem ocorreu {h_in.strftime('%H:%M')}-{h_out.strftime('%H:%M')} e o posto registrou {comb['hora']}."))
@@ -211,7 +232,7 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
         viagem_anterior = {'km_out': km_out, 'valido_tempo': valido_tempo, 'data_out': data_out if valido_tempo else None}
         logs_bdt.append({"Data": data_viagem, "Hora In": linha.get('hora_in', ''), "Hora Fim": linha.get('hora_out', ''), "Origem": origem, "Destino": destino, "KM Inicial": km_in, "KM Final": km_out, "Distância (km)": distancia, "KM Maps": km_maps_str})
 
-    limite_horas = CONFIGURACOES["horas_trabalho_dia"] + CONFIGURACOES["horas_extra_limite"]
+    limite_horas = CONFIG_ATUAL["horas_trabalho_dia"] + CONFIG_ATUAL["horas_extra_limite"]
     for dia_jornada, dados_jornada in jornada_diaria.items():
         horas_trabalhadas = (dados_jornada["ultimo_out"] - dados_jornada["primeiro_in"]).total_seconds() / 3600.0
         if horas_trabalhadas > limite_horas:
@@ -221,22 +242,37 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
     if tempo_util_velocidade > 0:
         velocidade_media_geral = distancia_util_velocidade / tempo_util_velocidade
 
+    # ==========================================
+    # CÁLCULOS FINAIS E TANQUE VIRTUAL (CORRIGIDO PARA USAR SÓ BDT)
+    # ==========================================
+    total_rodado_auditoria = km_total_declarado + km_total_nao_registrado
     total_litros = sum(float(comb['litros']) for comb in dados_combustivel if comb.get('litros'))
-    if len(dados_bdt) > 0:
-        km_absoluto_inicial = float(dados_bdt[0]['km_in'])
-        km_absoluto_final = float(dados_bdt[-1]['km_out'])
-        distancia_total_mes = km_absoluto_final - km_absoluto_inicial
-        
-        if total_litros > 0 and distancia_total_mes > 0:
-            consumo_real = distancia_total_mes / total_litros
-            consumo_esp = CONFIGURACOES["consumo_esperado_km_l"]
-            margem = CONFIGURACOES["margem_tolerancia_consumo"]
-            
-            if consumo_real < (consumo_esp - margem):
-                alertas.append(criar_alerta("INC-CNS01", f"Veículo fez apenas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Desvio excessivo."))
-            elif consumo_real > (consumo_esp + margem):
-                alertas.append(criar_alerta("INC-CNS01", f"Veículo fez irrealistas {consumo_real:.1f} KM/L (Esperado: ~{consumo_esp} KM/L). Notas omitidas ou erro de KM."))
+    
+    consumo_esperado_litros = 0
+    saldo_teorico_litros = 0
+    consumo_real = 0
 
+    # CORREÇÃO: Consumo Esperado baseado estritamente na quilometragem REGISTRADA (BDT)
+    if km_total_declarado > 0:
+        consumo_esperado_litros = km_total_declarado / CONFIG_ATUAL["consumo_esperado_km_l"]
+        # O saldo da empresa é o que foi abastecido menos o que era esperado gastar nas rotas oficiais
+        saldo_teorico_litros = total_litros - consumo_esperado_litros
+
+    # CORREÇÃO: Consumo Real calculado dividindo apenas as KMs oficiais do BDT pelos litros totais
+    if total_litros > 0 and km_total_declarado > 0:
+        consumo_real = km_total_declarado / total_litros
+        consumo_esp = CONFIG_ATUAL["consumo_esperado_km_l"]
+        margem = CONFIG_ATUAL["margem_tolerancia_consumo"]
+        
+        # Alertas de desvio de consumo baseados na eficiência real dentro do BDT
+        if consumo_real < (consumo_esp - margem):
+            alertas.append(criar_alerta("INC-CNS01", f"Veículo fez apenas {consumo_real:.1f} KM/L no BDT (Esperado: ~{consumo_esp} KM/L). Desvio excessivo ou queima suspeita de combustível."))
+        elif consumo_real > (consumo_esp + margem):
+            alertas.append(criar_alerta("INC-CNS01", f"Veículo fez irrealistas {consumo_real:.1f} KM/L no BDT (Esperado: ~{consumo_esp} KM/L). Indica omissão de notas de abastecimento ou erro no hodômetro BDT."))
+
+    # ==========================================
+    # GERAÇÃO DOS DATAFRAMES E EXCEL
+    # ==========================================
     df_bdt = pd.DataFrame(logs_bdt)
     df_comb = pd.DataFrame(dados_combustivel)
     
@@ -252,13 +288,16 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
         df_alertas = pd.DataFrame(columns=["Grau", "Código", "Descrição", "Ocorrência", "Ação Recomendada"])
     
     df_resumo = pd.DataFrame({
-        "Indicador": ["Distância Declarada (BDT)", "Distância Omitida (Saltos)", "Total Rodado Real", "Velocidade Média Geral", "Consumo Médio Calculado"],
+        "Indicador": ["Distância Declarada (BDT)", "Distância Omitida (Saltos)", "Total Rodado Real", "Velocidade Média Geral", "Consumo Real (KM/L)", "Consumo Esperado (L)", "Total Abastecido / Ticket (L)", "Saldo da Empresa (L)"],
         "Valor": [
             f"{km_total_declarado:.1f} km", 
             f"{km_total_nao_registrado:.1f} km", 
-            f"{(km_total_declarado + km_total_nao_registrado):.1f} km", 
+            f"{total_rodado_auditoria:.1f} km", 
             f"{velocidade_media_geral:.1f} km/h", 
-            f"{consumo_real:.1f} km/L"
+            f"{consumo_real:.1f} km/L",              # Atualizado nomenclatura
+            f"{consumo_esperado_litros:.1f} L",      
+            f"{total_litros:.1f} L",      
+            f"{saldo_teorico_litros:.1f} L"       
         ]
     })
 
@@ -289,9 +328,12 @@ def rodar_auditoria_completa(dados_bdt, dados_combustivel):
         "status": "sucesso",
         "km_declarado": km_total_declarado,
         "km_nao_registrado": km_total_nao_registrado,
-        "total_rodado": km_total_declarado + km_total_nao_registrado,
+        "total_rodado": total_rodado_auditoria,
         "velocidade_media": velocidade_media_geral,
         "consumo": consumo_real,
+        "consumo_esperado": consumo_esperado_litros,
+        "total_abastecido": total_litros,
+        "saldo_teorico": saldo_teorico_litros,
         "alertas": alertas,
         "excel_b64": excel_b64
     }

@@ -104,13 +104,15 @@ def api_editar_veiculo(id_veiculo):
     return jsonify({"status": "erro", "mensagem": mensagem}), 400
 
 @app.route('/api/auditar', methods=['POST'])
-def api_auditar():
-    dados = request.json
-    dados_bdt = dados.get('bdt', [])
-    dados_combustivel = dados.get('combustivel', [])
+def api_auditar_viagens():
+    dados = request.get_json()
+    viagens = dados.get('bdt', [])
+    combustivel = dados.get('combustivel', [])
+    configuracoes = dados.get('configuracoes', None) # Pega as regras da tela
     
-    resultado = rodar_auditoria_completa(dados_bdt, dados_combustivel)
-    return jsonify(resultado)
+    # Passa as regras pra função
+    resultado = rodar_auditoria_completa(viagens, combustivel, configs_dinamicas=configuracoes)
+    return jsonify(resultado), 200
 
 @app.route('/api/importar', methods=['POST'])
 def api_importar():
